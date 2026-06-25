@@ -1,0 +1,7 @@
+{
+    "take_profit_mult": 1.4,
+    "stop_loss_mult": 0.92,
+    "trailing_activation_pct": 0.1,
+    "trailing_stop_mult": 0.9,
+    "ofi_threshold": 0.08
+}

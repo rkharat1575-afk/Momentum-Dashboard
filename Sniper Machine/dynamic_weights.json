@@ -1,0 +1,5 @@
+{
+    "slope_threshold": 0.4,
+    "imbalance_threshold": 0.25,
+    "vwap_dev_threshold": 1.0
+}

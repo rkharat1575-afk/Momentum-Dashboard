@@ -1,0 +1,50 @@
+# Credentials & environment variables
+.env
+.env.local
+access_token.txt
+last_token_response.json
+auto_tokens_meta.json
+auto_tokens.txt
+
+# Python cache & virtualenv
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# Data Files & Databases (Prevent committing massive datasets)
+*.csv
+*.xlsx
+nc_scrip_master.csv
+nf_scrip_master_expanded.csv
+live_ticks.json
+
+# Temporary/Local logs
+ws_log.txt
+radar_debug.txt
+radar_error.txt
+WS_CONNECTED.txt
+
+# React frontend node_modules & build
+node_modules/
+dist/
+dist-ssr/
+.eslintcache
+.vscode/
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Backup and Recovery directories (prevents duplicate old scripts and secrets leakage)
+new_claude_scripts/
+Pro_Engine/
+recovery_point_v4_2_base/
+recovered_from_logs/
+
