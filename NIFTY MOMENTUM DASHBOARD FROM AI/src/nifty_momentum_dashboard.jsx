@@ -237,7 +237,7 @@ export default function Dashboard() {
     return `ws://${hostname}:8080`;
   });
   const [connected, setConnected] = useState(false);
-  const [loggedIn, setLoggedIn] = useState(true);
+  const [loggedIn, setLoggedIn] = useState(false);
   const [authStatus, setAuthStatus] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -715,6 +715,27 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {/* ── CONNECTION LOST WARNING BANNER ── */}
+      {!connected && loggedIn && (
+        <div style={{
+          background: "#7f1d1d", color: "#fca5a5", padding: "8px 16px",
+          textAlign: "center", fontSize: "12px", fontWeight: "600",
+          borderBottom: "1px solid #991b1b", display: "flex", alignItems: "center",
+          justifyContent: "center", gap: "8px", zIndex: 101, position: "relative"
+        }}>
+          <span>⚠️ Connection to Python backend lost. Showing last cached data.</span>
+          <button 
+            onClick={() => setShowSettings(true)}
+            style={{
+              background: "rgba(255,255,255,0.15)", border: "none", color: "#fff",
+              padding: "2px 8px", borderRadius: "4px", cursor: "pointer", fontSize: "11px"
+            }}
+          >
+            Settings
+          </button>
+        </div>
+      )}
 
       {!loggedIn ? (
         <div className="grid-bg" style={{
