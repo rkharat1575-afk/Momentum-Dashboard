@@ -47,4 +47,6 @@ new_claude_scripts/
 Pro_Engine/
 recovery_point_v4_2_base/
 recovered_from_logs/
+last_nifty_spot.txt
+last_tick_time.txt
 
