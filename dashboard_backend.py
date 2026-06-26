@@ -108,8 +108,13 @@ last_option_ticks_obj_minute: dict = {}   # written by tick handler, read by rad
 last_nifty_spot = 0.0
 
 # ─── AUTHENTICATION & TOKENS ─────────────────────────────────────────────────
-with open("access_token.txt", encoding="utf-8") as f:
-    access_token = f.read().strip()
+access_token = ""
+if os.path.exists("access_token.txt"):
+    try:
+        with open("access_token.txt", encoding="utf-8") as f:
+            access_token = f.read().strip()
+    except Exception as e:
+        print(f"Warning: Could not read access_token.txt on startup: {e}")
 
 api_key = os.environ.get("SHAREKHAN_API_KEY", "")
 
@@ -166,6 +171,95 @@ def init_master_data() -> None:
 
 
 init_master_data()
+
+
+# ─── AUTHENTICATION HELPERS ──────────────────────────────────────────────────
+
+def perform_sharekhan_auth(request_token_str: str) -> tuple[bool, str]:
+    """
+    Exchanges the request_token for an access_token.
+    Saves it to access_token.txt.
+    """
+    global access_token, api_key
+    secret_key = os.environ.get("SHAREKHAN_SECRET_KEY", "")
+    if not api_key or not secret_key:
+        return False, "SHAREKHAN_API_KEY or SHAREKHAN_SECRET_KEY environment variable is missing"
+
+    try:
+        from SharekhanApi.sharekhanConnect import SharekhanConnect
+        login = SharekhanConnect(api_key=api_key)
+        
+        if len(secret_key) != 32:
+            print(f"WARNING: SECRET_KEY length is {len(secret_key)}. Expected 32 characters.")
+
+        session = login.generate_session_without_versionId(request_token_str, secret_key)
+        response = login.get_access_token(api_key, session, 12345)
+        
+        # Save response for debugging
+        with open("last_token_response.json", "w") as f:
+            json.dump(response, f, indent=2)
+
+        # Extract the token
+        extracted = None
+        if isinstance(response, str):
+            extracted = response.strip()
+        elif isinstance(response, dict):
+            candidate_keys = ["accessToken", "access_token", "AccessToken", "token", "Token"]
+            for key in candidate_keys:
+                val = response.get(key)
+                if val and isinstance(val, str) and len(val) > 10:
+                    extracted = val.strip()
+                    break
+            if not extracted:
+                data = response.get("data") or response.get("Data")
+                if isinstance(data, dict):
+                    for key in candidate_keys:
+                        val = data.get(key)
+                        if val and isinstance(val, str) and len(val) > 10:
+                            extracted = val.strip()
+                            break
+
+        if not extracted:
+            return False, f"Could not extract access token from response: {response}"
+
+        # Success! Save access token globally and to file
+        access_token = extracted
+        with open("access_token.txt", "w", encoding="utf-8") as f:
+            f.write(access_token)
+
+        print("✅ Sharekhan Authentication Successful!")
+        
+        # If there is an active socket client, disconnect it so that it will reconnect with the new token
+        global sws_global
+        if sws_global:
+            try:
+                sws_global.close_connection()
+            except Exception:
+                pass
+            sws_global = None
+
+        return True, "Success"
+
+    except Exception as e:
+        import traceback
+        err_msg = f"{type(e).__name__}: {e}"
+        print(f"❌ Sharekhan Auth Error: {err_msg}")
+        traceback.print_exc()
+        return False, err_msg
+
+
+def broadcast_auth_status(success: bool, message: str) -> None:
+    if not loop or not clients:
+        return
+    msg = json.dumps({
+        "type": "auth_status",
+        "success": success,
+        "message": message,
+        "logged_in": success,
+    })
+    for client in list(clients):
+        asyncio.run_coroutine_threadsafe(client.send(msg), loop)
+
 
 # ─── GLOBAL STATE ────────────────────────────────────────────────────────────
 clients:               set  = set()
@@ -237,11 +331,13 @@ def broadcast_tick(tick_obj: dict) -> None:
 
 
 async def ws_handler(websocket) -> None:
+    global current_expiry
     clients.add(websocket)
     await websocket.send(json.dumps({
         "type":           "metadata",
         "expiries":       available_expiries,
         "current_expiry": current_expiry,
+        "logged_in":      bool(access_token),
     }))
 
     for tick_obj in nifty_tick_cache:
@@ -258,6 +354,35 @@ async def ws_handler(websocket) -> None:
 
             if action == "set_expiry":
                 handle_set_expiry(data.get("expiry"))
+
+            elif action == "submit_request_token":
+                req_token = data.get("request_token")
+                def run_auth():
+                    return perform_sharekhan_auth(req_token)
+                
+                success, msg = await asyncio.get_event_loop().run_in_executor(None, run_auth)
+                if success:
+                    init_master_data()
+                    if available_expiries and not current_expiry:
+                        current_expiry = available_expiries[0]
+                        handle_set_expiry(current_expiry)
+                    
+                    await websocket.send(json.dumps({
+                        "type": "auth_status",
+                        "success": True,
+                        "message": "Authentication successful",
+                        "logged_in": True,
+                        "expiries": available_expiries,
+                        "current_expiry": current_expiry
+                    }))
+                    broadcast_auth_status(True, "Authenticated successfully")
+                else:
+                    await websocket.send(json.dumps({
+                        "type": "auth_status",
+                        "success": False,
+                        "message": f"Authentication failed: {msg}",
+                        "logged_in": False
+                    }))
 
             elif action == "log_signal":
                 trade = {
@@ -290,8 +415,218 @@ async def ws_handler(websocket) -> None:
         clients.discard(websocket)
 
 
+async def process_http_request(connection, request):
+    from urllib.parse import urlparse, parse_qs
+    parsed = urlparse(request.path)
+    
+    if parsed.path == "/login":
+        global api_key
+        try:
+            from SharekhanApi.sharekhanConnect import SharekhanConnect
+            login = SharekhanConnect(api_key=api_key)
+            url = login.login_url(vendor_key=None, version_id=None)
+            from websockets.datastructures import Headers
+            return websockets.Response(
+                status_code=302,
+                reason_phrase="Found",
+                headers=Headers([
+                    ("Location", url),
+                    ("Cache-Control", "no-cache")
+                ]),
+                body=b""
+            )
+        except Exception as e:
+            from websockets.datastructures import Headers
+            return websockets.Response(
+                status_code=500,
+                reason_phrase="Internal Server Error",
+                headers=Headers([("Content-Type", "text/plain")]),
+                body=f"Failed to generate login URL: {e}".encode("utf-8")
+            )
+            
+    elif parsed.path == "/callback":
+        qs = parse_qs(parsed.query)
+        req_token_list = qs.get("request_token")
+        if req_token_list:
+            req_token = req_token_list[0].strip()
+            
+            def run_auth():
+                return perform_sharekhan_auth(req_token)
+            
+            success, msg = await asyncio.get_event_loop().run_in_executor(None, run_auth)
+            
+            from websockets.datastructures import Headers
+            if success:
+                init_master_data()
+                global current_expiry
+                if available_expiries and not current_expiry:
+                    current_expiry = available_expiries[0]
+                    handle_set_expiry(current_expiry)
+                
+                broadcast_auth_status(True, "Authenticated successfully")
+                
+                html_body = """
+                <html>
+                <head>
+                    <title>Authentication Successful</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <style>
+                        body {
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                            background: #090d16;
+                            color: #f8fafc;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            height: 100vh;
+                            margin: 0;
+                            text-align: center;
+                        }
+                        .container {
+                            background: #111827;
+                            padding: 2.5rem;
+                            border-radius: 16px;
+                            border: 1px solid #1f2937;
+                            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+                            max-width: 450px;
+                            width: 90%;
+                        }
+                        h1 { color: #10b981; margin-top: 0; font-size: 1.75rem; }
+                        p { color: #9ca3af; font-size: 1.1rem; line-height: 1.6; }
+                        .btn {
+                            display: inline-block;
+                            margin-top: 1.5rem;
+                            background: #3b82f6;
+                            color: white;
+                            padding: 0.75rem 1.75rem;
+                            border-radius: 8px;
+                            text-decoration: none;
+                            font-weight: 600;
+                            transition: all 0.2s;
+                        }
+                        .btn:hover { background: #2563eb; transform: translateY(-1px); }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1>✓ Authentication Successful</h1>
+                        <p>Sharekhan API connection has been successfully established and the stream has started.</p>
+                        <a href="javascript:window.close();" class="btn">Close Window</a>
+                    </div>
+                </body>
+                </html>
+                """
+                return websockets.Response(
+                    status_code=200,
+                    reason_phrase="OK",
+                    headers=Headers([
+                        ("Content-Type", "text/html; charset=utf-8"),
+                        ("Access-Control-Allow-Origin", "*")
+                    ]),
+                    body=html_body.encode("utf-8")
+                )
+            else:
+                broadcast_auth_status(False, f"Authentication failed: {msg}")
+                html_body = f"""
+                <html>
+                <head>
+                    <title>Authentication Failed</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <style>
+                        body {{
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                            background: #090d16;
+                            color: #f8fafc;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            height: 100vh;
+                            margin: 0;
+                            text-align: center;
+                        }}
+                        .container {{
+                            background: #111827;
+                            padding: 2.5rem;
+                            border-radius: 16px;
+                            border: 1px solid #1f2937;
+                            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+                            max-width: 450px;
+                            width: 90%;
+                        }}
+                        h1 {{ color: #ef4444; margin-top: 0; font-size: 1.75rem; }}
+                        p {{ color: #9ca3af; font-size: 1.1rem; line-height: 1.6; }}
+                        .error-detail {{
+                            background: #030712;
+                            color: #f43f5e;
+                            padding: 1rem;
+                            border-radius: 8px;
+                            font-family: monospace;
+                            text-align: left;
+                            word-break: break-all;
+                            margin-top: 1.25rem;
+                            font-size: 0.9rem;
+                            border: 1px solid #374151;
+                        }}
+                        .btn {{
+                            display: inline-block;
+                            margin-top: 1.5rem;
+                            background: #3b82f6;
+                            color: white;
+                            padding: 0.75rem 1.75rem;
+                            border-radius: 8px;
+                            text-decoration: none;
+                            font-weight: 600;
+                            transition: all 0.2s;
+                        }}
+                        .btn:hover {{ background: #2563eb; transform: translateY(-1px); }}
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1>✗ Authentication Failed</h1>
+                        <p>We could not initialize the session with the provided token.</p>
+                        <div class="error-detail">{msg}</div>
+                        <a href="/login" class="btn">Try Login Again</a>
+                    </div>
+                </body>
+                </html>
+                """
+                return websockets.Response(
+                    status_code=400,
+                    reason_phrase="Bad Request",
+                    headers=Headers([
+                        ("Content-Type", "text/html; charset=utf-8"),
+                        ("Access-Control-Allow-Origin", "*")
+                    ]),
+                    body=html_body.encode("utf-8")
+                )
+        else:
+            from websockets.datastructures import Headers
+            return websockets.Response(
+                status_code=400,
+                reason_phrase="Bad Request",
+                headers=Headers([("Content-Type", "text/plain")]),
+                body=b"Missing request_token query parameter."
+            )
+            
+    elif parsed.path == "/health":
+        from websockets.datastructures import Headers
+        status_text = "OK - Connected to Sharekhan" if sws_global else "OK - Waiting for token"
+        return websockets.Response(
+            status_code=200,
+            reason_phrase="OK",
+            headers=Headers([
+                ("Content-Type", "text/plain"),
+                ("Access-Control-Allow-Origin", "*")
+            ]),
+            body=status_text.encode("utf-8")
+        )
+        
+    return None
+
+
 async def run_server() -> None:
-    async with websockets.serve(ws_handler, "localhost", 8080):
+    async with websockets.serve(ws_handler, "0.0.0.0", 8080, process_request=process_http_request):
         await asyncio.Future()
 
 
@@ -299,7 +634,7 @@ def start_ws_server() -> None:
     global loop
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    print("Local WebSocket Server started on ws://localhost:8080")
+    print("Local WebSocket Server started on ws://0.0.0.0:8080")
     loop.run_until_complete(run_server())
 
 
@@ -791,7 +1126,12 @@ if __name__ == "__main__":
 
     while True:
         try:
-            connect_sharekhan()
+            if access_token:
+                connect_sharekhan()
+            else:
+                print("No active Sharekhan session. Backend is waiting for token from dashboard...")
+                time.sleep(5)
+                continue
         except Exception as e:
             print(f"Main loop error: {e}")
         print("Reconnecting in 5 seconds...")

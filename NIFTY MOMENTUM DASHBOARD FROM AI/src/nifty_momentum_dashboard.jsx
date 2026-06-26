@@ -229,6 +229,20 @@ export default function Dashboard() {
   const liveOptionsRef = useRef({});
   const strikeScoresRef = useRef({});
 
+  const [backendUrl, setBackendUrl] = useState(() => {
+    const saved = localStorage.getItem("ws_backend_url");
+    if (saved) return saved;
+    if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
+    const hostname = window.location.hostname || "localhost";
+    return `ws://${hostname}:8080`;
+  });
+  const [connected, setConnected] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(true);
+  const [authStatus, setAuthStatus] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [recsTimestamp, setRecsTimestamp] = useState("");
+
   const vixRef = useRef(vix);
   const capRef = useRef(capital);
   const instRef = useRef(instrument);
@@ -237,6 +251,12 @@ export default function Dashboard() {
   useEffect(() => { vixRef.current = vix; }, [vix]);
   useEffect(() => { capRef.current = capital; }, [capital]);
   useEffect(() => { instRef.current = instrument; }, [instrument]);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     fetch('/strategy_config.json?t=' + Date.now())
@@ -258,12 +278,45 @@ export default function Dashboard() {
     setSelectedStrike(null);
     setTradePhase(null);
     confirmRef.current = 0;
+    setConnected(false);
     
     let currentTicks = [];
+    let ws;
+    try {
+      console.log("Connecting to WebSocket:", backendUrl);
+      ws = new WebSocket(backendUrl);
+      wsRef.current = ws;
+    } catch (e) {
+      console.error("Failed to create WebSocket:", e);
+      return;
+    }
     
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8080';
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    ws.onopen = () => {
+      console.log("WebSocket connected successfully!");
+      setConnected(true);
+      setAuthStatus(null);
+      
+      const urlParams = new URLSearchParams(window.location.search);
+      const requestToken = urlParams.get("request_token");
+      if (requestToken) {
+        console.log("Submitting captured request_token via WS:", requestToken);
+        ws.send(JSON.stringify({
+          action: "submit_request_token",
+          request_token: requestToken
+        }));
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    };
+    
+    ws.onclose = () => {
+      console.log("WebSocket connection closed.");
+      setConnected(false);
+    };
+    
+    ws.onerror = (err) => {
+      console.error("WebSocket error:", err);
+      setConnected(false);
+    };
     
     ws.onmessage = (event) => {
       try {
@@ -274,10 +327,25 @@ export default function Dashboard() {
           if (data.expiries.length > 0) {
             setSelectedExpiry(data.current_expiry || data.expiries[0]);
           }
+          if (data.logged_in !== undefined) {
+            setLoggedIn(data.logged_in);
+          }
           return;
         }
         
-
+        if (data.type === "auth_status") {
+          setLoggedIn(data.logged_in);
+          setAuthStatus({
+            success: data.success,
+            message: data.message
+          });
+          if (data.success) {
+            if (data.expiries) setExpiries(data.expiries);
+            if (data.current_expiry) setSelectedExpiry(data.current_expiry);
+          }
+          return;
+        }
+        
         if (data.instrument === "REVERSAL_ENGINE") {
           setReversalState(data.state);
           return;
@@ -297,14 +365,13 @@ export default function Dashboard() {
           }, ...l].slice(0, 8));
           return;
         }
-
+        
         if (data.type === "score_update") {
           strikeScoresRef.current[data.strike] = data.score;
           if (data.components) window.latestMicrostructure = data.components;
           setStrikeScores({ ...strikeScoresRef.current });
           return;
         }
-
         
         if (data.instrument && data.instrument !== instRef.current) return;
         
@@ -314,7 +381,7 @@ export default function Dashboard() {
           setLiveOptions({ ...liveOptionsRef.current });
           return;
         }
-
+        
         const tick = data.tick;
         currentTicks.push(tick);
         if (currentTicks.length > 500) currentTicks = currentTicks.slice(-500);
@@ -335,7 +402,7 @@ export default function Dashboard() {
           const next = [...h, { price: tick.price, ts: tick.ts }];
           return next.slice(-80);
         });
-
+        
         try {
           const playAlertSound = (direction) => {
             try {
@@ -346,7 +413,6 @@ export default function Dashboard() {
               osc.connect(gainNode);
               gainNode.connect(ctx.destination);
               
-              // High pitch for BULL, Low pitch for BEAR
               osc.type = 'sine';
               osc.frequency.setValueAtTime(direction === "BULL" ? 880 : 330, ctx.currentTime);
               
@@ -357,7 +423,7 @@ export default function Dashboard() {
               osc.stop(ctx.currentTime + 0.5);
             } catch(e) { console.log("Audio blocked"); }
           };
-
+          
           let maxScore = -1;
           let bestDir = "NEUTRAL";
           for (const [strikeKey, score] of Object.entries(strikeScoresRef.current)) {
@@ -378,11 +444,13 @@ export default function Dashboard() {
           };
           
           setSignals(pseudoSigs);
-
+          
           const recs = recommendStrikes(pseudoSigs, instRef.current, vixRef.current, capRef.current, liveOptionsRef.current, strikeScoresRef.current);
           setStrikes(recs);
+          if (recs && recs.length > 0) {
+            setRecsTimestamp(new Date().toLocaleTimeString());
+          }
           
-          // Phase display handling based on the actual backend score instead of legacy logic
           if (maxScore >= 60.0) {
               setPhase("SIGNAL");
           } else if (maxScore > 30.0) {
@@ -402,7 +470,7 @@ export default function Dashboard() {
     return () => {
       ws.close();
     };
-  }, [instrument]);
+  }, [backendUrl, instrument]);
 
   const spot = signals?.spot ?? (ticks.length > 0 ? ticks[ticks.length - 1].price : (instrument === "NIFTY" ? NIFTY_BASE : BANKNIFTY_BASE));
   const prevSpot = priceHistory.length > 1 ? priceHistory[priceHistory.length - 2].price : spot;
@@ -429,13 +497,13 @@ export default function Dashboard() {
   const dirColor = signals?.direction === "BULL" ? "#10b981" : signals?.direction === "BEAR" ? "#ef4444" : "#888";
 
   return (
-    <div style={{
+    <div className={loggedIn && isMobile ? "dark" : ""} style={{
       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-      background: "radial-gradient(circle at 50% 0%, #f8fafc, #e2e8f0)",
+      background: loggedIn && isMobile ? "#090d16" : "radial-gradient(circle at 50% 0%, #f8fafc, #e2e8f0)",
       minHeight: "100vh",
-      color: "#1e293b",
+      color: loggedIn && isMobile ? "#f8fafc" : "#1e293b",
       padding: "0",
-      overflow: "hidden",
+      overflowX: "hidden",
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');
@@ -444,7 +512,9 @@ export default function Dashboard() {
         ::-webkit-scrollbar-track { background: #0a0f1a; }
         ::-webkit-scrollbar-thumb { background: #1e3a5f; border-radius: 2px; }
         .panel { background: rgba(255,255,255,0.95); border: 1px solid rgba(203,213,225,1); border-radius: 6px; }
+        .dark .panel { background: rgba(17,24,39,0.8); border: 1px solid rgba(255,255,255,0.08); }
         .panel-glow { box-shadow: 0 0 20px rgba(0,120,255,0.08), inset 0 0 40px rgba(0,60,120,0.05); }
+        .dark .panel-glow { box-shadow: 0 0 20px rgba(0,120,255,0.15), inset 0 0 40px rgba(0,20,40,0.2); }
         .ticker-val { font-family: 'Orbitron', monospace; letter-spacing: 0.05em; }
         .axis-bar { height: 6px; border-radius: 3px; transition: width 0.4s cubic-bezier(.4,0,.2,1); }
         .signal-pulse { animation: pulse 1.2s ease-in-out infinite; }
@@ -461,6 +531,10 @@ export default function Dashboard() {
           display: flex;
           flex-direction: column;
           gap: 6px;
+        }
+        .dark .strike-card {
+          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(31,41,55,0.4);
         }
         .strike-card:hover { border-color: rgba(59,130,246,0.5); background: rgba(59,130,246,0.1); }
         .strike-card.best { border-color: rgba(16,185,129,0.5); background: rgba(16,185,129,0.15); }
@@ -486,23 +560,92 @@ export default function Dashboard() {
                             linear-gradient(90deg, rgba(0,80,160,0.04) 1px, transparent 1px);
           background-size: 40px 40px;
         }
+        .dark .grid-bg {
+          background-image: linear-gradient(rgba(0,120,255,0.02) 1px, transparent 1px),
+                            linear-gradient(90deg, rgba(0,120,255,0.02) 1px, transparent 1px);
+        }
       `}</style>
 
+      {/* ── SETTINGS MODAL ── */}
+      {showSettings && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(15, 23, 42, 0.8)", backdropFilter: "blur(8px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 1000, padding: "20px"
+        }}>
+          <div className="panel" style={{
+            background: "#0f172a", border: "1px solid #1e293b", color: "#f8fafc",
+            width: "100%", maxWidth: "450px", borderRadius: "12px", padding: "24px"
+          }}>
+            <h3 style={{ fontFamily: "Orbitron", fontSize: "16px", marginBottom: "16px", color: "#3b82f6" }}>CONNECTION SETTINGS</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <label style={{ fontSize: "12px", color: "#94a3b8" }}>
+                WebSocket Backend URL:
+                <input 
+                  type="text" 
+                  value={backendUrl}
+                  onChange={(e) => setBackendUrl(e.target.value)}
+                  style={{
+                    width: "100%", padding: "8px 12px", borderRadius: "6px",
+                    background: "#1e293b", border: "1px solid #334155", color: "#fff",
+                    fontSize: "13px", marginTop: "4px", outline: "none", fontFamily: "inherit"
+                  }} 
+                />
+              </label>
+              <div style={{ fontSize: "12px", color: "#64748b" }}>
+                Note: Local Wi-Fi connection usually uses `ws://YOUR_LAPTOP_IP:8080`.
+              </div>
+              <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                <button 
+                  onClick={() => {
+                    localStorage.setItem("ws_backend_url", backendUrl);
+                    setShowSettings(false);
+                  }}
+                  className="btn active"
+                  style={{ flex: 1, padding: "10px", fontSize: "12px" }}
+                >
+                  Save & Connect
+                </button>
+                <button 
+                  onClick={() => setShowSettings(false)}
+                  className="btn"
+                  style={{ flex: 1, padding: "10px", fontSize: "12px" }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── HEADER ── */}
-      <div style={{ background: "rgba(241,245,249,0.98)", borderBottom: "1px solid rgba(203,213,225,1)", padding: "10px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100 }}>
+      <div style={{ 
+        background: loggedIn && isMobile ? "rgba(17,24,39,0.98)" : "rgba(241,245,249,0.98)", 
+        borderBottom: loggedIn && isMobile ? "1px solid #1f2937" : "1px solid rgba(203,213,225,1)", 
+        padding: "10px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", 
+        position: "sticky", top: 0, zIndex: 100 
+      }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981", boxShadow: "0 0 8px #10b981" }} className="signal-pulse" />
-            <span style={{ fontFamily: "Orbitron", fontSize: 13, fontWeight: 700, color: "#0f172a", letterSpacing: "0.1em" }}>MOMENTUM ENGINE</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ 
+              width: 8, height: 8, borderRadius: "50%", 
+              background: connected ? "#10b981" : "#ef4444", 
+              boxShadow: `0 0 8px ${connected ? "#10b981" : "#ef4444"}` 
+            }} className={connected ? "signal-pulse" : ""} />
+            <span style={{ fontFamily: "Orbitron", fontSize: 13, fontWeight: 700, color: loggedIn && isMobile ? "#f8fafc" : "#0f172a", letterSpacing: "0.1em" }}>MOMENTUM ENGINE</span>
           </div>
-          <div style={{ display: "flex", gap: 6 }}>
-            {["NIFTY","BANKNIFTY"].map(ins => (
-              <button key={ins} className={`btn ${instrument===ins?"active":""}`} onClick={()=>setInstrument(ins)}>{ins}</button>
-            ))}
-          </div>
-          {expiries.length > 0 && (
+          {loggedIn && (
+            <div style={{ display: "flex", gap: 6 }}>
+              {["NIFTY","BANKNIFTY"].map(ins => (
+                <button key={ins} className={`btn ${instrument===ins?"active":""}`} onClick={()=>setInstrument(ins)}>{ins}</button>
+              ))}
+            </div>
+          )}
+          {loggedIn && expiries.length > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 10 }}>
-              <span style={{ fontSize: 14, color: "#475569" }}>EXPIRY</span>
+              <span style={{ fontSize: 12, color: loggedIn && isMobile ? "#9ca3af" : "#475569" }}>EXPIRY</span>
               <select 
                 value={selectedExpiry}
                 onChange={(e) => {
@@ -513,52 +656,333 @@ export default function Dashboard() {
                   }
                 }}
                 style={{
-                  background: "rgba(241,245,249,1)",
-                  border: "1px solid rgba(59,130,246,0.3)",
+                  background: loggedIn && isMobile ? "#1f2937" : "rgba(241,245,249,1)",
+                  border: `1px solid ${loggedIn && isMobile ? "#374151" : "rgba(59,130,246,0.3)"}`,
                   color: "#10b981",
                   padding: "2px 6px",
                   borderRadius: 4,
-                  fontSize: 13,
+                  fontSize: 12,
                   fontFamily: "Orbitron",
                   outline: "none",
                   cursor: "pointer"
                 }}
               >
                 {expiries.map(exp => (
-                  <option key={exp} value={exp} style={{ background: "radial-gradient(circle at 50% 0%, #f8fafc, #e2e8f0)", color: "#1e293b" }}>{exp}</option>
+                  <option key={exp} value={exp} style={{ background: loggedIn && isMobile ? "#111827" : "#fff", color: loggedIn && isMobile ? "#fff" : "#1e293b" }}>{exp}</option>
                 ))}
               </select>
             </div>
           )}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          <div style={{ fontSize: 14, color: "#475569" }}>
-            TICKS <span style={{ color: "#0f172a" }}>{tickCount.toLocaleString()}</span>
-          </div>
-          <div style={{ fontSize: 14, color: "#475569" }}>
-            VIX <input type="range" min="10" max="30" step="0.1" value={vix}
-              onChange={e=>setVix(parseFloat(e.target.value))}
-              style={{ width: 70, accentColor: "#0080ff", verticalAlign: "middle" }} />
-            <span style={{ color: vix > 20 ? "#dc2626" : vix < 14 ? "#ffcc44" : "#10b981", marginLeft: 4 }}>{vix.toFixed(1)}</span>
-          </div>
-          <div style={{ fontSize: 14, color: "#475569" }}>
-            ₹CAP <input type="number" value={capital/100000} min={1} max={50} step={0.5}
-              onChange={e=>setCapital(parseFloat(e.target.value)*100000)}
-              style={{ width: 50, background: "transparent", border: "1px solid #1e3a5f", color: "#0f172a", fontSize: 14, padding: "2px 4px", borderRadius: 3, fontFamily: "inherit" }} />L
-          </div>
-          <div style={{
-            padding: "4px 12px", borderRadius: 4, fontSize: 13, fontWeight: 600,
-            background: phase === "SIGNAL" ? "rgba(0,200,80,0.2)" : "rgba(0,60,120,0.3)",
-            border: `1px solid ${phase === "SIGNAL" ? "rgba(0,255,136,0.5)" : "rgba(203,213,225,1)"}`,
-            color: phase === "SIGNAL" ? "#10b981" : "#64748b",
-            letterSpacing: "0.1em",
-            ...(phase === "SIGNAL" ? { animation: "pulse 1s ease-in-out infinite" } : {})
-          }}>
-            {phase}
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 15 }}>
+          {loggedIn && !isMobile && (
+            <>
+              <div style={{ fontSize: 12, color: "#475569" }}>
+                TICKS <span style={{ color: "#0f172a" }}>{tickCount.toLocaleString()}</span>
+              </div>
+              <div style={{ fontSize: 12, color: "#475569" }}>
+                VIX <input type="range" min="10" max="30" step="0.1" value={vix}
+                  onChange={e=>setVix(parseFloat(e.target.value))}
+                  style={{ width: 70, accentColor: "#0080ff", verticalAlign: "middle" }} />
+                <span style={{ color: vix > 20 ? "#dc2626" : vix < 14 ? "#ffcc44" : "#10b981", marginLeft: 4 }}>{vix.toFixed(1)}</span>
+              </div>
+              <div style={{ fontSize: 12, color: "#475569" }}>
+                ₹CAP <input type="number" value={capital/100000} min={1} max={50} step={0.5}
+                  onChange={e=>setCapital(parseFloat(e.target.value)*100000)}
+                  style={{ width: 50, background: "transparent", border: "1px solid #1e3a5f", color: "#0f172a", fontSize: 12, padding: "2px 4px", borderRadius: 3, fontFamily: "inherit" }} />L
+              </div>
+              <div style={{
+                padding: "4px 12px", borderRadius: 4, fontSize: 12, fontWeight: 600,
+                background: phase === "SIGNAL" ? "rgba(0,200,80,0.2)" : "rgba(0,60,120,0.3)",
+                border: `1px solid ${phase === "SIGNAL" ? "rgba(0,255,136,0.5)" : "rgba(203,213,225,1)"}`,
+                color: phase === "SIGNAL" ? "#10b981" : "#64748b",
+                letterSpacing: "0.1em",
+                ...(phase === "SIGNAL" ? { animation: "pulse 1s ease-in-out infinite" } : {})
+              }}>
+                {phase}
+              </div>
+            </>
+          )}
+          <button 
+            onClick={() => setShowSettings(true)}
+            style={{
+              background: "transparent", border: "none", cursor: "pointer", fontSize: "16px",
+              padding: "4px 8px", color: loggedIn && isMobile ? "#9ca3af" : "#475569", transition: "color 0.2s"
+            }}
+            title="Settings"
+          >
+            ⚙️
+          </button>
         </div>
       </div>
 
+      {!loggedIn ? (
+        <div className="grid-bg" style={{
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          minHeight: "calc(100vh - 100px)", padding: "20px"
+        }}>
+          <div className="panel panel-glow" style={{
+            background: isMobile ? "#111827" : "rgba(255, 255, 255, 0.9)",
+            border: isMobile ? "1px solid #1f2937" : "1px solid rgba(203,213,225,1)",
+            padding: isMobile ? "32px 24px" : "40px",
+            borderRadius: "12px", width: "100%", maxWidth: "450px",
+            textAlign: "center", color: isMobile ? "#f8fafc" : "#0f172a"
+          }}>
+            <div style={{
+              width: "60px", height: "60px", borderRadius: "50%",
+              background: "rgba(59,130,246,0.1)", display: "flex", alignItems: "center",
+              justifyContent: "center", margin: "0 auto 20px", border: "1px solid rgba(59,130,246,0.2)"
+            }}>
+              <span style={{ fontSize: "28px" }}>🔑</span>
+            </div>
+            
+            <h2 style={{ fontFamily: "Orbitron", fontSize: "20px", fontWeight: 700, letterSpacing: "0.08em", marginBottom: "12px" }}>
+              MOMENTUM ENGINE
+            </h2>
+            
+            <p style={{ fontSize: "14px", color: isMobile ? "#9ca3af" : "#64748b", lineHeight: 1.5, marginBottom: "28px" }}>
+              Connect your Sharekhan account to start the live institutional momentum scanner.
+            </p>
+
+            {authStatus && (
+              <div style={{
+                padding: "12px 16px", borderRadius: "8px", fontSize: "13px",
+                background: authStatus.success ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
+                border: `1px solid ${authStatus.success ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}`,
+                color: authStatus.success ? "#10b981" : "#ef4444",
+                marginBottom: "20px", textAlign: "left"
+              }}>
+                {authStatus.message}
+              </div>
+            )}
+            
+            <button
+              onClick={() => {
+                const httpUrl = backendUrl.replace(/^ws/, "http");
+                window.location.href = `${httpUrl}/login`;
+              }}
+              className="btn active"
+              style={{
+                width: "100%", padding: "12px", fontSize: "14px", fontWeight: "600",
+                fontFamily: "Orbitron", borderRadius: "8px", textTransform: "uppercase",
+                letterSpacing: "0.1em", cursor: "pointer", transition: "all 0.2s",
+                boxShadow: "0 4px 12px rgba(59, 130, 246, 0.2)"
+              }}
+            >
+              Login to Sharekhan
+            </button>
+
+            <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: `1px solid ${isMobile ? "#1f2937" : "rgba(226,232,240,1)"}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px" }}>
+                <span style={{ color: isMobile ? "#9ca3af" : "#64748b" }}>Connection Status:</span>
+                <span style={{ fontWeight: 600, color: connected ? "#10b981" : "#ef4444" }}>
+                  {connected ? "Connected to Backend" : "Disconnected"}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", marginTop: "8px" }}>
+                <span style={{ color: isMobile ? "#9ca3af" : "#64748b" }}>Server:</span>
+                <span style={{ fontFamily: "monospace", color: isMobile ? "#d1d5db" : "#334155" }}>
+                  {backendUrl}
+                </span>
+              </div>
+              <button
+                onClick={() => setShowSettings(true)}
+                className="btn"
+                style={{ width: "100%", marginTop: "16px", padding: "8px" }}
+              >
+                Change Connection Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : isMobile ? (
+        <div className="grid-bg" style={{ padding: "12px", display: "flex", flexDirection: "column", gap: "12px", minHeight: "calc(100vh - 100px)", background: "#090d16" }}>
+          
+          {/* Ticker & Sparkline */}
+          <div className="panel panel-glow" style={{ padding: "12px", background: "#111827", border: "1px solid #1f2937" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: "11px", color: "#9ca3af", letterSpacing: "0.15em", marginBottom: 2 }}>{instrument} FUTURES</div>
+                <div className="ticker-val" style={{ fontSize: "24px", fontWeight: 700, color: isUp ? "#10b981" : "#ef4444" }}>
+                  {spot.toFixed(2)}
+                </div>
+                <div style={{ fontSize: "12px", color: isUp ? "#10b981" : "#ef4444", marginTop: 2 }}>
+                  {isUp ? "▲" : "▼"} {Math.abs(spotChange).toFixed(2)} ({spotChangePct.toFixed(2)}%)
+                </div>
+              </div>
+              <div style={{ position: "relative", width: "120px", height: "45px" }}>
+                <svg width="120" height="45">
+                  <path d={sparkPath()} fill="none" stroke={isUp ? "#10b981" : "#ef4444"} strokeWidth="2" vectorEffect="non-scaling-stroke"
+                    viewBox="0 0 200 50" style={{ transform: "scale(0.6, 0.9)", transformOrigin: "0 0" }} />
+                </svg>
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#9ca3af", marginTop: "10px", paddingTop: "8px", borderTop: "1px solid #1f2937" }}>
+              <span>VWAP: <strong style={{ color: "#f8fafc" }}>{signals?.vwap?.toFixed(1) ?? "—"}</strong></span>
+              <span>IV: <strong style={{ color: "#f59e0b" }}>{signals ? (signals.iv * 100).toFixed(1) : "—"}%</strong></span>
+              <span>VIX: <strong style={{ color: vix > 20 ? "#ef4444" : "#10b981" }}>{vix.toFixed(1)}</strong></span>
+            </div>
+          </div>
+
+          {/* Reversal Engine & Seller Stress Row */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+            {/* Reversal Engine */}
+            <div className="panel panel-glow" style={{ 
+              padding: "12px", background: "#111827", 
+              border: reversalState.startsWith("REVERSAL") ? "1px solid #f59e0b" : "1px solid #1f2937",
+              display: "flex", flexDirection: "column", justifyContent: "center"
+            }}>
+              <span style={{ fontSize: "10px", color: "#9ca3af", letterSpacing: "0.1em", marginBottom: "6px" }}>REVERSAL STATE</span>
+              <span style={{ 
+                fontSize: "14px", fontWeight: 700, 
+                color: reversalState.includes("LONG") ? "#10b981" : reversalState.includes("SHORT") ? "#ef4444" : "#f8fafc" 
+              }} className={reversalState.startsWith("REVERSAL") ? "signal-pulse" : ""}>
+                {reversalState.replace("_", " ")}
+              </span>
+            </div>
+
+            {/* Seller Stress Gauge */}
+            <div className="panel panel-glow" style={{ padding: "12px", background: "#111827", border: "1px solid #1f2937" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                <span style={{ fontSize: "10px", color: "#10b981", letterSpacing: "0.1em" }}>SELLER STRESS</span>
+                <span style={{ fontSize: "9px", color: "#9ca3af" }}>MIN {strategyConfig.MIN_COMPOSITE_SCORE}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "2px" }}>
+                <span className="ticker-val" style={{ fontSize: "22px", fontWeight: 900, color: scoreColor(chainContext?.seller_stress_score ?? 0) }}>
+                  {chainContext ? chainContext.seller_stress_score.toFixed(1) : "0.0"}
+                </span>
+                <span style={{ fontSize: "10px", color: "#9ca3af" }}>/100</span>
+              </div>
+              <div style={{ height: "4px", background: "#1f2937", borderRadius: "2px", overflow: "hidden", marginTop: "6px" }}>
+                <div style={{
+                  height: "100%",
+                  width: `${Math.min(100, ((chainContext?.seller_stress_score ?? 0) / 100) * 100)}%`,
+                  background: scoreColor(chainContext?.seller_stress_score ?? 0),
+                  transition: "width 0.4s ease"
+                }}/>
+              </div>
+            </div>
+          </div>
+
+          {/* Institutional Radar */}
+          <div className="panel panel-glow" style={{ padding: "12px", background: "#111827", border: "1px solid #1f2937" }}>
+            <span style={{ fontSize: "11px", color: "#9ca3af", letterSpacing: "0.1em", display: "block", marginBottom: "8px" }}>INSTITUTIONAL RADAR</span>
+            {chainContext ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
+                  <span style={{ color: "#9ca3af" }}>IV Skew Bias:</span>
+                  <span style={{ fontWeight: 700, color: chainContext.skew_direction === "CALL_BID" ? "#10b981" : chainContext.skew_direction === "PUT_BID" ? "#ef4444" : "#8b5cf6" }}>
+                    {chainContext.skew_direction === "CALL_BID" ? "BULLISH (FEAR)" : chainContext.skew_direction === "PUT_BID" ? "BEARISH" : "NEUTRAL"}
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
+                  <span style={{ color: "#9ca3af" }}>Chain PCR:</span>
+                  <span style={{ fontWeight: 700, color: chainContext.current_pcr > 1.2 ? "#10b981" : chainContext.current_pcr < 0.8 ? "#ef4444" : "#8b5cf6" }}>
+                    {chainContext.current_pcr.toFixed(2)}
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
+                  <span style={{ color: "#9ca3af" }}>Gamma Walls:</span>
+                  <span style={{ color: "#f59e0b", fontFamily: "Orbitron", textAlign: "right", fontSize: "11px" }}>
+                    C: {chainContext.nearest_call_wall || "None"} | P: {chainContext.nearest_put_wall || "None"}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: "12px", color: "#64748b", textAlign: "center", padding: "10px 0" }}>
+                Awaiting Options Chain Data...
+              </div>
+            )}
+          </div>
+
+          {/* Strike Recommendations */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: 1 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+              <span style={{ fontSize: "12px", color: "#9ca3af", letterSpacing: "0.15em" }}>STRIKE RECOMMENDATIONS</span>
+              {recsTimestamp && (
+                <span style={{ fontSize: "11px", color: "#64748b" }}>Generated: {recsTimestamp}</span>
+              )}
+            </div>
+
+            {strikes.length === 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "180px", background: "#111827", border: "1px solid #1f2937", borderRadius: "8px" }}>
+                <div className="scan-rotate" style={{ width: "30px", height: "30px", border: "2px solid #374151", borderTop: "2px solid #3b82f6", borderRadius: "50%", marginBottom: "12px" }}/>
+                <span style={{ fontSize: "12px", color: "#9ca3af" }}>{phase.startsWith("ERR") ? phase : "SCANNING FOR MOMENTUM..."}</span>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {strikes.map((s) => (
+                  <div key={`${s.strike}-${s.type}`}
+                    className={`strike-card ${s.isBest ? "best" : ""} ${selectedStrike?.strike === s.strike ? "selected" : ""}`}
+                    onClick={() => setSelectedStrike(selectedStrike?.strike === s.strike ? null : s)}
+                    style={{ padding: "10px", background: "#111827" }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ fontFamily: "Orbitron", fontSize: "16px", fontWeight: 700, color: s.type === "CE" ? "#10b981" : "#ef4444" }}>{s.strike}</span>
+                        <span style={{ fontSize: "10px", padding: "1px 4px", borderRadius: "3px", background: s.type === "CE" ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)", color: s.type === "CE" ? "#10b981" : "#ef4444", fontWeight: 700 }}>{s.type}</span>
+                        <span style={{ fontSize: "10px", color: "#9ca3af" }}>{s.label}</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                        <span style={{ fontSize: "10px", color: "#9ca3af" }}>Score:</span>
+                        <span style={{ fontFamily: "Orbitron", fontSize: "12px", fontWeight: 700, color: scoreColor(s.strikeScore) }}>{s.strikeScore.toFixed(1)}</span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px", marginBottom: "6px" }}>
+                      <div style={{ background: "#1f2937", padding: "4px 6px", borderRadius: "4px" }}>
+                        <div style={{ fontSize: "9px", color: "#9ca3af" }}>Live Prem</div>
+                        <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981", fontFamily: "Orbitron" }}>
+                          {liveOptions[s.strike]?.[s.type] ? `₹${liveOptions[s.strike][s.type]}` : `₹${s.premium}`}
+                        </div>
+                      </div>
+                      <div style={{ background: "#1f2937", padding: "4px 6px", borderRadius: "4px" }}>
+                        <div style={{ fontSize: "9px", color: "#9ca3af" }}>Stop Loss</div>
+                        <div style={{ fontSize: "12px", fontWeight: 700, color: "#ef4444", fontFamily: "Orbitron" }}>₹{s.hardStopPremium}</div>
+                      </div>
+                      <div style={{ background: "#1f2937", padding: "4px 6px", borderRadius: "4px" }}>
+                        <div style={{ fontSize: "9px", color: "#9ca3af" }}>Target 1</div>
+                        <div style={{ fontSize: "12px", fontWeight: 700, color: "#f59e0b", fontFamily: "Orbitron" }}>₹{s.target1}</div>
+                      </div>
+                    </div>
+
+                    {s.isBest && (
+                      <div style={{ padding: "2px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "4px", fontSize: "9px", color: "#10b981", textAlign: "center", letterSpacing: "0.05em", fontWeight: 700 }}>
+                        ★ HIGHEST PROBABILITY ENTRY
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Selected Strike Mobile Detail */}
+          {selectedStrike && (
+            <div className="panel" style={{ padding: "12px", background: "#111827", border: "1px solid #3b82f6" }}>
+              <div style={{ fontSize: "11px", color: "#9ca3af", letterSpacing: "0.1em", marginBottom: "8px" }}>
+                TRADE PLAN: {selectedStrike.strike} {selectedStrike.type}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+                <div style={{ background: "#1f2937", padding: "6px", borderRadius: "4px" }}>
+                  <div style={{ fontSize: "10px", color: "#9ca3af" }}>Max Lots</div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#f8fafc" }}>{selectedStrike.maxLots} ({selectedStrike.maxLots * LOT_SIZE[instrument]} units)</div>
+                </div>
+                <div style={{ background: "#1f2937", padding: "6px", borderRadius: "4px" }}>
+                  <div style={{ fontSize: "10px", color: "#9ca3af" }}>Total Max Risk</div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#ef4444" }}>₹{(selectedStrike.riskPerLot * selectedStrike.maxLots).toLocaleString()}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: "11px", color: "#9ca3af", display: "flex", flexDirection: "column", gap: "4px" }}>
+                <div>› SL: Exit if premium &lt; ₹{selectedStrike.hardStopPremium}</div>
+                <div>› T1: Book 33% at ₹{selectedStrike.target1} (+30%)</div>
+                <div>› T2: Book rest at ₹{selectedStrike.target2} (+80%)</div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      ) : (
       <div className="grid-bg" style={{ padding: "2px 6px", display: "grid", gridTemplateColumns: "280px 1fr 260px", gap: 4, minHeight: "calc(100vh - 50px)" }}>
 
         {/* ── LEFT PANEL: SIGNAL ENGINE ── */}
@@ -957,6 +1381,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
