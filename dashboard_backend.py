@@ -51,7 +51,10 @@ from chain_analyzer import analyze_chain
 from volatility_solver import calculate_iv
 from telegram_bot import send_telegram_alert   # single canonical import
 from dataclasses import asdict
-import winsound  # Windows only — replace/guard if running on Linux/macOS
+try:
+    import winsound  # Windows only — replace/guard if running on Linux/macOS
+except ImportError:
+    winsound = None
 
 tick_velocity_queue = collections.deque(maxlen=50)
 velocity_tps = 0.0
@@ -1053,9 +1056,10 @@ def connect_sharekhan() -> None:
                             )
                             print(f"🟢 {trade_type}: BUY {strike_key} {info['optType']} @ {ltp} | Score: {score:.1f}")
                             trigger_telegram_async(msg)
-                            threading.Thread(
-                                target=lambda: winsound.Beep(1500, 800), daemon=True
-                            ).start()
+                            if winsound:
+                                threading.Thread(
+                                    target=lambda: winsound.Beep(1500, 800), daemon=True
+                                ).start()
 
                     # ── Trade management ──────────────────────────────────
                     for t in list(active_trades):
