@@ -242,6 +242,11 @@ export default function Dashboard() {
   const [showSettings, setShowSettings] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [recsTimestamp, setRecsTimestamp] = useState("");
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem("dashboard_theme");
+    if (saved) return saved;
+    return window.innerWidth < 768 ? "dark" : "light";
+  });
 
   const vixRef = useRef(vix);
   const capRef = useRef(capital);
@@ -497,11 +502,11 @@ export default function Dashboard() {
   const dirColor = signals?.direction === "BULL" ? "#10b981" : signals?.direction === "BEAR" ? "#ef4444" : "#888";
 
   return (
-    <div className={loggedIn && isMobile ? "dark" : ""} style={{
+    <div className={theme === "dark" ? "dark" : ""} style={{
       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-      background: loggedIn && isMobile ? "#090d16" : "radial-gradient(circle at 50% 0%, #f8fafc, #e2e8f0)",
+      background: theme === "dark" ? "#090d16" : "radial-gradient(circle at 50% 0%, #f8fafc, #e2e8f0)",
       minHeight: "100vh",
-      color: loggedIn && isMobile ? "#f8fafc" : "#1e293b",
+      color: theme === "dark" ? "#f8fafc" : "#1e293b",
       padding: "0",
       overflowX: "hidden",
     }}>
@@ -622,8 +627,8 @@ export default function Dashboard() {
 
       {/* ── HEADER ── */}
       <div style={{ 
-        background: loggedIn && isMobile ? "rgba(17,24,39,0.98)" : "rgba(241,245,249,0.98)", 
-        borderBottom: loggedIn && isMobile ? "1px solid #1f2937" : "1px solid rgba(203,213,225,1)", 
+        background: theme === "dark" ? "rgba(17,24,39,0.98)" : "rgba(241,245,249,0.98)", 
+        borderBottom: theme === "dark" ? "1px solid #1f2937" : "1px solid rgba(203,213,225,1)", 
         padding: "10px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", 
         position: "sticky", top: 0, zIndex: 100 
       }}>
@@ -634,7 +639,7 @@ export default function Dashboard() {
               background: connected ? "#10b981" : "#ef4444", 
               boxShadow: `0 0 8px ${connected ? "#10b981" : "#ef4444"}` 
             }} className={connected ? "signal-pulse" : ""} />
-            <span style={{ fontFamily: "Orbitron", fontSize: 13, fontWeight: 700, color: loggedIn && isMobile ? "#f8fafc" : "#0f172a", letterSpacing: "0.1em" }}>MOMENTUM ENGINE</span>
+            <span style={{ fontFamily: "Orbitron", fontSize: 13, fontWeight: 700, color: theme === "dark" ? "#f8fafc" : "#0f172a", letterSpacing: "0.1em" }}>MOMENTUM ENGINE</span>
           </div>
           {loggedIn && (
             <div style={{ display: "flex", gap: 6 }}>
@@ -645,7 +650,7 @@ export default function Dashboard() {
           )}
           {loggedIn && expiries.length > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 10 }}>
-              <span style={{ fontSize: 12, color: loggedIn && isMobile ? "#9ca3af" : "#475569" }}>EXPIRY</span>
+              <span style={{ fontSize: 12, color: theme === "dark" ? "#9ca3af" : "#475569" }}>EXPIRY</span>
               <select 
                 value={selectedExpiry}
                 onChange={(e) => {
@@ -656,8 +661,8 @@ export default function Dashboard() {
                   }
                 }}
                 style={{
-                  background: loggedIn && isMobile ? "#1f2937" : "rgba(241,245,249,1)",
-                  border: `1px solid ${loggedIn && isMobile ? "#374151" : "rgba(59,130,246,0.3)"}`,
+                  background: theme === "dark" ? "#1f2937" : "rgba(241,245,249,1)",
+                  border: `1px solid ${theme === "dark" ? "#374151" : "rgba(59,130,246,0.3)"}`,
                   color: "#10b981",
                   padding: "2px 6px",
                   borderRadius: 4,
@@ -668,7 +673,7 @@ export default function Dashboard() {
                 }}
               >
                 {expiries.map(exp => (
-                  <option key={exp} value={exp} style={{ background: loggedIn && isMobile ? "#111827" : "#fff", color: loggedIn && isMobile ? "#fff" : "#1e293b" }}>{exp}</option>
+                  <option key={exp} value={exp} style={{ background: theme === "dark" ? "#111827" : "#fff", color: theme === "dark" ? "#fff" : "#1e293b" }}>{exp}</option>
                 ))}
               </select>
             </div>
@@ -677,25 +682,25 @@ export default function Dashboard() {
         <div style={{ display: "flex", alignItems: "center", gap: 15 }}>
           {loggedIn && !isMobile && (
             <>
-              <div style={{ fontSize: 12, color: "#475569" }}>
-                TICKS <span style={{ color: "#0f172a" }}>{tickCount.toLocaleString()}</span>
+              <div style={{ fontSize: 12, color: theme === "dark" ? "#9ca3af" : "#475569" }}>
+                TICKS <span style={{ color: theme === "dark" ? "#f8fafc" : "#0f172a" }}>{tickCount.toLocaleString()}</span>
               </div>
-              <div style={{ fontSize: 12, color: "#475569" }}>
+              <div style={{ fontSize: 12, color: theme === "dark" ? "#9ca3af" : "#475569" }}>
                 VIX <input type="range" min="10" max="30" step="0.1" value={vix}
                   onChange={e=>setVix(parseFloat(e.target.value))}
                   style={{ width: 70, accentColor: "#0080ff", verticalAlign: "middle" }} />
                 <span style={{ color: vix > 20 ? "#dc2626" : vix < 14 ? "#ffcc44" : "#10b981", marginLeft: 4 }}>{vix.toFixed(1)}</span>
               </div>
-              <div style={{ fontSize: 12, color: "#475569" }}>
+              <div style={{ fontSize: 12, color: theme === "dark" ? "#9ca3af" : "#475569" }}>
                 ₹CAP <input type="number" value={capital/100000} min={1} max={50} step={0.5}
                   onChange={e=>setCapital(parseFloat(e.target.value)*100000)}
-                  style={{ width: 50, background: "transparent", border: "1px solid #1e3a5f", color: "#0f172a", fontSize: 12, padding: "2px 4px", borderRadius: 3, fontFamily: "inherit" }} />L
+                  style={{ width: 50, background: "transparent", border: `1px solid ${theme === "dark" ? "#374151" : "#1e3a5f"}`, color: theme === "dark" ? "#f8fafc" : "#0f172a", fontSize: 12, padding: "2px 4px", borderRadius: 3, fontFamily: "inherit" }} />L
               </div>
               <div style={{
                 padding: "4px 12px", borderRadius: 4, fontSize: 12, fontWeight: 600,
-                background: phase === "SIGNAL" ? "rgba(0,200,80,0.2)" : "rgba(0,60,120,0.3)",
-                border: `1px solid ${phase === "SIGNAL" ? "rgba(0,255,136,0.5)" : "rgba(203,213,225,1)"}`,
-                color: phase === "SIGNAL" ? "#10b981" : "#64748b",
+                background: phase === "SIGNAL" ? "rgba(0,200,80,0.2)" : theme === "dark" ? "rgba(31,41,55,0.4)" : "rgba(0,60,120,0.3)",
+                border: `1px solid ${phase === "SIGNAL" ? "rgba(0,255,136,0.5)" : theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(203,213,225,1)"}`,
+                color: phase === "SIGNAL" ? "#10b981" : theme === "dark" ? "#9ca3af" : "#64748b",
                 letterSpacing: "0.1em",
                 ...(phase === "SIGNAL" ? { animation: "pulse 1s ease-in-out infinite" } : {})
               }}>
@@ -704,10 +709,24 @@ export default function Dashboard() {
             </>
           )}
           <button 
+            onClick={() => {
+              const nextTheme = theme === "dark" ? "light" : "dark";
+              setTheme(nextTheme);
+              localStorage.setItem("dashboard_theme", nextTheme);
+            }}
+            style={{
+              background: "transparent", border: "none", cursor: "pointer", fontSize: "16px",
+              padding: "4px 8px", color: theme === "dark" ? "#9ca3af" : "#475569", transition: "color 0.2s"
+            }}
+            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
+          <button 
             onClick={() => setShowSettings(true)}
             style={{
               background: "transparent", border: "none", cursor: "pointer", fontSize: "16px",
-              padding: "4px 8px", color: loggedIn && isMobile ? "#9ca3af" : "#475569", transition: "color 0.2s"
+              padding: "4px 8px", color: theme === "dark" ? "#9ca3af" : "#475569", transition: "color 0.2s"
             }}
             title="Settings"
           >
@@ -743,11 +762,11 @@ export default function Dashboard() {
           minHeight: "calc(100vh - 100px)", padding: "20px"
         }}>
           <div className="panel panel-glow" style={{
-            background: isMobile ? "#111827" : "rgba(255, 255, 255, 0.9)",
-            border: isMobile ? "1px solid #1f2937" : "1px solid rgba(203,213,225,1)",
+            background: theme === "dark" ? "#111827" : "rgba(255, 255, 255, 0.9)",
+            border: theme === "dark" ? "1px solid #1f2937" : "1px solid rgba(203,213,225,1)",
             padding: isMobile ? "32px 24px" : "40px",
             borderRadius: "12px", width: "100%", maxWidth: "450px",
-            textAlign: "center", color: isMobile ? "#f8fafc" : "#0f172a"
+            textAlign: "center", color: theme === "dark" ? "#f8fafc" : "#0f172a"
           }}>
             <div style={{
               width: "60px", height: "60px", borderRadius: "50%",
@@ -761,7 +780,7 @@ export default function Dashboard() {
               MOMENTUM ENGINE
             </h2>
             
-            <p style={{ fontSize: "14px", color: isMobile ? "#9ca3af" : "#64748b", lineHeight: 1.5, marginBottom: "28px" }}>
+            <p style={{ fontSize: "14px", color: theme === "dark" ? "#9ca3af" : "#64748b", lineHeight: 1.5, marginBottom: "28px" }}>
               Connect your Sharekhan account to start the live institutional momentum scanner.
             </p>
 
@@ -793,16 +812,16 @@ export default function Dashboard() {
               Login to Sharekhan
             </button>
 
-            <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: `1px solid ${isMobile ? "#1f2937" : "rgba(226,232,240,1)"}` }}>
+            <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: `1px solid ${theme === "dark" ? "#1f2937" : "rgba(226,232,240,1)"}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px" }}>
-                <span style={{ color: isMobile ? "#9ca3af" : "#64748b" }}>Connection Status:</span>
+                <span style={{ color: theme === "dark" ? "#9ca3af" : "#64748b" }}>Connection Status:</span>
                 <span style={{ fontWeight: 600, color: connected ? "#10b981" : "#ef4444" }}>
                   {connected ? "Connected to Backend" : "Disconnected"}
                 </span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", marginTop: "8px" }}>
-                <span style={{ color: isMobile ? "#9ca3af" : "#64748b" }}>Server:</span>
-                <span style={{ fontFamily: "monospace", color: isMobile ? "#d1d5db" : "#334155" }}>
+                <span style={{ color: theme === "dark" ? "#9ca3af" : "#64748b" }}>Server:</span>
+                <span style={{ fontFamily: "monospace", color: theme === "dark" ? "#d1d5db" : "#334155" }}>
                   {backendUrl}
                 </span>
               </div>
@@ -817,13 +836,13 @@ export default function Dashboard() {
           </div>
         </div>
       ) : isMobile ? (
-        <div className="grid-bg" style={{ padding: "12px", display: "flex", flexDirection: "column", gap: "12px", minHeight: "calc(100vh - 100px)", background: "#090d16" }}>
+        <div className="grid-bg" style={{ padding: "12px", display: "flex", flexDirection: "column", gap: "12px", minHeight: "calc(100vh - 100px)", background: theme === "dark" ? "#090d16" : "radial-gradient(circle at 50% 0%, #f8fafc, #e2e8f0)" }}>
           
           {/* Ticker & Sparkline */}
-          <div className="panel panel-glow" style={{ padding: "12px", background: "#111827", border: "1px solid #1f2937" }}>
+          <div className="panel panel-glow" style={{ padding: "12px", background: theme === "dark" ? "#111827" : "rgba(255, 255, 255, 0.95)", border: `1px solid ${theme === "dark" ? "#1f2937" : "rgba(203,213,225,1)"}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div style={{ fontSize: "11px", color: "#9ca3af", letterSpacing: "0.15em", marginBottom: 2 }}>{instrument} FUTURES</div>
+                <div style={{ fontSize: "11px", color: theme === "dark" ? "#9ca3af" : "#475569", letterSpacing: "0.15em", marginBottom: 2 }}>{instrument} FUTURES</div>
                 <div className="ticker-val" style={{ fontSize: "24px", fontWeight: 700, color: isUp ? "#10b981" : "#ef4444" }}>
                   {spot.toFixed(2)}
                 </div>
@@ -838,8 +857,8 @@ export default function Dashboard() {
                 </svg>
               </div>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#9ca3af", marginTop: "10px", paddingTop: "8px", borderTop: "1px solid #1f2937" }}>
-              <span>VWAP: <strong style={{ color: "#f8fafc" }}>{signals?.vwap?.toFixed(1) ?? "—"}</strong></span>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: theme === "dark" ? "#9ca3af" : "#475569", marginTop: "10px", paddingTop: "8px", borderTop: `1px solid ${theme === "dark" ? "#1f2937" : "rgba(203,213,225,1)"}` }}>
+              <span>VWAP: <strong style={{ color: theme === "dark" ? "#f8fafc" : "#0f172a" }}>{signals?.vwap?.toFixed(1) ?? "—"}</strong></span>
               <span>IV: <strong style={{ color: "#f59e0b" }}>{signals ? (signals.iv * 100).toFixed(1) : "—"}%</strong></span>
               <span>VIX: <strong style={{ color: vix > 20 ? "#ef4444" : "#10b981" }}>{vix.toFixed(1)}</strong></span>
             </div>
@@ -849,32 +868,32 @@ export default function Dashboard() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
             {/* Reversal Engine */}
             <div className="panel panel-glow" style={{ 
-              padding: "12px", background: "#111827", 
-              border: reversalState.startsWith("REVERSAL") ? "1px solid #f59e0b" : "1px solid #1f2937",
+              padding: "12px", background: theme === "dark" ? "#111827" : "rgba(255, 255, 255, 0.95)", 
+              border: reversalState.startsWith("REVERSAL") ? "1px solid #f59e0b" : theme === "dark" ? "1px solid #1f2937" : "1px solid rgba(203,213,225,1)",
               display: "flex", flexDirection: "column", justifyContent: "center"
             }}>
-              <span style={{ fontSize: "10px", color: "#9ca3af", letterSpacing: "0.1em", marginBottom: "6px" }}>REVERSAL STATE</span>
+              <span style={{ fontSize: "10px", color: theme === "dark" ? "#9ca3af" : "#475569", letterSpacing: "0.1em", marginBottom: "6px" }}>REVERSAL STATE</span>
               <span style={{ 
                 fontSize: "14px", fontWeight: 700, 
-                color: reversalState.includes("LONG") ? "#10b981" : reversalState.includes("SHORT") ? "#ef4444" : "#f8fafc" 
+                color: reversalState.includes("LONG") ? "#10b981" : reversalState.includes("SHORT") ? "#ef4444" : (theme === "dark" ? "#f8fafc" : "#0f172a") 
               }} className={reversalState.startsWith("REVERSAL") ? "signal-pulse" : ""}>
                 {reversalState.replace("_", " ")}
               </span>
             </div>
 
             {/* Seller Stress Gauge */}
-            <div className="panel panel-glow" style={{ padding: "12px", background: "#111827", border: "1px solid #1f2937" }}>
+            <div className="panel panel-glow" style={{ padding: "12px", background: theme === "dark" ? "#111827" : "rgba(255, 255, 255, 0.95)", border: `1px solid ${theme === "dark" ? "#1f2937" : "rgba(203,213,225,1)"}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
                 <span style={{ fontSize: "10px", color: "#10b981", letterSpacing: "0.1em" }}>SELLER STRESS</span>
-                <span style={{ fontSize: "9px", color: "#9ca3af" }}>MIN {strategyConfig.MIN_COMPOSITE_SCORE}</span>
+                <span style={{ fontSize: "9px", color: theme === "dark" ? "#9ca3af" : "#475569" }}>MIN {strategyConfig.MIN_COMPOSITE_SCORE}</span>
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: "2px" }}>
                 <span className="ticker-val" style={{ fontSize: "22px", fontWeight: 900, color: scoreColor(chainContext?.seller_stress_score ?? 0) }}>
                   {chainContext ? chainContext.seller_stress_score.toFixed(1) : "0.0"}
                 </span>
-                <span style={{ fontSize: "10px", color: "#9ca3af" }}>/100</span>
+                <span style={{ fontSize: "10px", color: theme === "dark" ? "#9ca3af" : "#475569" }}>/100</span>
               </div>
-              <div style={{ height: "4px", background: "#1f2937", borderRadius: "2px", overflow: "hidden", marginTop: "6px" }}>
+              <div style={{ height: "4px", background: theme === "dark" ? "#1f2937" : "rgba(203,213,225,1)", borderRadius: "2px", overflow: "hidden", marginTop: "6px" }}>
                 <div style={{
                   height: "100%",
                   width: `${Math.min(100, ((chainContext?.seller_stress_score ?? 0) / 100) * 100)}%`,
@@ -886,31 +905,31 @@ export default function Dashboard() {
           </div>
 
           {/* Institutional Radar */}
-          <div className="panel panel-glow" style={{ padding: "12px", background: "#111827", border: "1px solid #1f2937" }}>
-            <span style={{ fontSize: "11px", color: "#9ca3af", letterSpacing: "0.1em", display: "block", marginBottom: "8px" }}>INSTITUTIONAL RADAR</span>
+          <div className="panel panel-glow" style={{ padding: "12px", background: theme === "dark" ? "#111827" : "rgba(255, 255, 255, 0.95)", border: `1px solid ${theme === "dark" ? "#1f2937" : "rgba(203,213,225,1)"}` }}>
+            <span style={{ fontSize: "11px", color: theme === "dark" ? "#9ca3af" : "#475569", letterSpacing: "0.1em", display: "block", marginBottom: "8px" }}>INSTITUTIONAL RADAR</span>
             {chainContext ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
-                  <span style={{ color: "#9ca3af" }}>IV Skew Bias:</span>
+                  <span style={{ color: theme === "dark" ? "#9ca3af" : "#475569" }}>IV Skew Bias:</span>
                   <span style={{ fontWeight: 700, color: chainContext.skew_direction === "CALL_BID" ? "#10b981" : chainContext.skew_direction === "PUT_BID" ? "#ef4444" : "#8b5cf6" }}>
                     {chainContext.skew_direction === "CALL_BID" ? "BULLISH (FEAR)" : chainContext.skew_direction === "PUT_BID" ? "BEARISH" : "NEUTRAL"}
                   </span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
-                  <span style={{ color: "#9ca3af" }}>Chain PCR:</span>
+                  <span style={{ color: theme === "dark" ? "#9ca3af" : "#475569" }}>Chain PCR:</span>
                   <span style={{ fontWeight: 700, color: chainContext.current_pcr > 1.2 ? "#10b981" : chainContext.current_pcr < 0.8 ? "#ef4444" : "#8b5cf6" }}>
                     {chainContext.current_pcr.toFixed(2)}
                   </span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
-                  <span style={{ color: "#9ca3af" }}>Gamma Walls:</span>
+                  <span style={{ color: theme === "dark" ? "#9ca3af" : "#475569" }}>Gamma Walls:</span>
                   <span style={{ color: "#f59e0b", fontFamily: "Orbitron", textAlign: "right", fontSize: "11px" }}>
                     C: {chainContext.nearest_call_wall || "None"} | P: {chainContext.nearest_put_wall || "None"}
                   </span>
                 </div>
               </div>
             ) : (
-              <div style={{ fontSize: "12px", color: "#64748b", textAlign: "center", padding: "10px 0" }}>
+              <div style={{ fontSize: "12px", color: theme === "dark" ? "#9ca3af" : "#64748b", textAlign: "center", padding: "10px 0" }}>
                 Awaiting Options Chain Data...
               </div>
             )}
@@ -919,16 +938,16 @@ export default function Dashboard() {
           {/* Strike Recommendations */}
           <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: 1 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
-              <span style={{ fontSize: "12px", color: "#9ca3af", letterSpacing: "0.15em" }}>STRIKE RECOMMENDATIONS</span>
+              <span style={{ fontSize: "12px", color: theme === "dark" ? "#9ca3af" : "#475569", letterSpacing: "0.15em" }}>STRIKE RECOMMENDATIONS</span>
               {recsTimestamp && (
-                <span style={{ fontSize: "11px", color: "#64748b" }}>Generated: {recsTimestamp}</span>
+                <span style={{ fontSize: "11px", color: theme === "dark" ? "#9ca3af" : "#64748b" }}>Generated: {recsTimestamp}</span>
               )}
             </div>
 
             {strikes.length === 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "180px", background: "#111827", border: "1px solid #1f2937", borderRadius: "8px" }}>
-                <div className="scan-rotate" style={{ width: "30px", height: "30px", border: "2px solid #374151", borderTop: "2px solid #3b82f6", borderRadius: "50%", marginBottom: "12px" }}/>
-                <span style={{ fontSize: "12px", color: "#9ca3af" }}>{phase.startsWith("ERR") ? phase : "SCANNING FOR MOMENTUM..."}</span>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "180px", background: theme === "dark" ? "#111827" : "rgba(255, 255, 255, 0.95)", border: `1px solid ${theme === "dark" ? "#1f2937" : "rgba(203,213,225,1)"}`, borderRadius: "8px" }}>
+                <div className="scan-rotate" style={{ width: "30px", height: "30px", border: `2px solid ${theme === "dark" ? "#374151" : "#cbd5e1"}`, borderTop: "2px solid #3b82f6", borderRadius: "50%", marginBottom: "12px" }}/>
+                <span style={{ fontSize: "12px", color: theme === "dark" ? "#9ca3af" : "#475569" }}>{phase.startsWith("ERR") ? phase : "SCANNING FOR MOMENTUM..."}</span>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -936,33 +955,33 @@ export default function Dashboard() {
                   <div key={`${s.strike}-${s.type}`}
                     className={`strike-card ${s.isBest ? "best" : ""} ${selectedStrike?.strike === s.strike ? "selected" : ""}`}
                     onClick={() => setSelectedStrike(selectedStrike?.strike === s.strike ? null : s)}
-                    style={{ padding: "10px", background: "#111827" }}
+                    style={{ padding: "10px", background: theme === "dark" ? "#111827" : "rgba(255, 255, 255, 0.95)" }}
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         <span style={{ fontFamily: "Orbitron", fontSize: "16px", fontWeight: 700, color: s.type === "CE" ? "#10b981" : "#ef4444" }}>{s.strike}</span>
                         <span style={{ fontSize: "10px", padding: "1px 4px", borderRadius: "3px", background: s.type === "CE" ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)", color: s.type === "CE" ? "#10b981" : "#ef4444", fontWeight: 700 }}>{s.type}</span>
-                        <span style={{ fontSize: "10px", color: "#9ca3af" }}>{s.label}</span>
+                        <span style={{ fontSize: "10px", color: theme === "dark" ? "#9ca3af" : "#475569" }}>{s.label}</span>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                        <span style={{ fontSize: "10px", color: "#9ca3af" }}>Score:</span>
+                        <span style={{ fontSize: "10px", color: theme === "dark" ? "#9ca3af" : "#475569" }}>Score:</span>
                         <span style={{ fontFamily: "Orbitron", fontSize: "12px", fontWeight: 700, color: scoreColor(s.strikeScore) }}>{s.strikeScore.toFixed(1)}</span>
                       </div>
                     </div>
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px", marginBottom: "6px" }}>
-                      <div style={{ background: "#1f2937", padding: "4px 6px", borderRadius: "4px" }}>
-                        <div style={{ fontSize: "9px", color: "#9ca3af" }}>Live Prem</div>
+                      <div style={{ background: theme === "dark" ? "#1f2937" : "rgba(241,245,249,1)", padding: "4px 6px", borderRadius: "4px", border: `1px solid ${theme === "dark" ? "transparent" : "rgba(203,213,225,0.5)"}` }}>
+                        <div style={{ fontSize: "9px", color: theme === "dark" ? "#9ca3af" : "#475569" }}>Live Prem</div>
                         <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981", fontFamily: "Orbitron" }}>
                           {liveOptions[s.strike]?.[s.type] ? `₹${liveOptions[s.strike][s.type]}` : `₹${s.premium}`}
                         </div>
                       </div>
-                      <div style={{ background: "#1f2937", padding: "4px 6px", borderRadius: "4px" }}>
-                        <div style={{ fontSize: "9px", color: "#9ca3af" }}>Stop Loss</div>
+                      <div style={{ background: theme === "dark" ? "#1f2937" : "rgba(241,245,249,1)", padding: "4px 6px", borderRadius: "4px", border: `1px solid ${theme === "dark" ? "transparent" : "rgba(203,213,225,0.5)"}` }}>
+                        <div style={{ fontSize: "9px", color: theme === "dark" ? "#9ca3af" : "#475569" }}>Stop Loss</div>
                         <div style={{ fontSize: "12px", fontWeight: 700, color: "#ef4444", fontFamily: "Orbitron" }}>₹{s.hardStopPremium}</div>
                       </div>
-                      <div style={{ background: "#1f2937", padding: "4px 6px", borderRadius: "4px" }}>
-                        <div style={{ fontSize: "9px", color: "#9ca3af" }}>Target 1</div>
+                      <div style={{ background: theme === "dark" ? "#1f2937" : "rgba(241,245,249,1)", padding: "4px 6px", borderRadius: "4px", border: `1px solid ${theme === "dark" ? "transparent" : "rgba(203,213,225,0.5)"}` }}>
+                        <div style={{ fontSize: "9px", color: theme === "dark" ? "#9ca3af" : "#475569" }}>Target 1</div>
                         <div style={{ fontSize: "12px", fontWeight: 700, color: "#f59e0b", fontFamily: "Orbitron" }}>₹{s.target1}</div>
                       </div>
                     </div>
@@ -980,21 +999,21 @@ export default function Dashboard() {
 
           {/* Selected Strike Mobile Detail */}
           {selectedStrike && (
-            <div className="panel" style={{ padding: "12px", background: "#111827", border: "1px solid #3b82f6" }}>
-              <div style={{ fontSize: "11px", color: "#9ca3af", letterSpacing: "0.1em", marginBottom: "8px" }}>
+            <div className="panel" style={{ padding: "12px", background: theme === "dark" ? "#111827" : "rgba(255, 255, 255, 0.95)", border: `1px solid ${theme === "dark" ? "#3b82f6" : "rgba(59,130,246,0.6)"}` }}>
+              <div style={{ fontSize: "11px", color: theme === "dark" ? "#9ca3af" : "#475569", letterSpacing: "0.1em", marginBottom: "8px" }}>
                 TRADE PLAN: {selectedStrike.strike} {selectedStrike.type}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
-                <div style={{ background: "#1f2937", padding: "6px", borderRadius: "4px" }}>
-                  <div style={{ fontSize: "10px", color: "#9ca3af" }}>Max Lots</div>
-                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#f8fafc" }}>{selectedStrike.maxLots} ({selectedStrike.maxLots * LOT_SIZE[instrument]} units)</div>
+                <div style={{ background: theme === "dark" ? "#1f2937" : "rgba(241,245,249,1)", padding: "6px", borderRadius: "4px", border: `1px solid ${theme === "dark" ? "transparent" : "rgba(203,213,225,0.5)"}` }}>
+                  <div style={{ fontSize: "10px", color: theme === "dark" ? "#9ca3af" : "#475569" }}>Max Lots</div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: theme === "dark" ? "#f8fafc" : "#0f172a" }}>{selectedStrike.maxLots} ({selectedStrike.maxLots * LOT_SIZE[instrument]} units)</div>
                 </div>
-                <div style={{ background: "#1f2937", padding: "6px", borderRadius: "4px" }}>
-                  <div style={{ fontSize: "10px", color: "#9ca3af" }}>Total Max Risk</div>
+                <div style={{ background: theme === "dark" ? "#1f2937" : "rgba(241,245,249,1)", padding: "6px", borderRadius: "4px", border: `1px solid ${theme === "dark" ? "transparent" : "rgba(203,213,225,0.5)"}` }}>
+                  <div style={{ fontSize: "10px", color: theme === "dark" ? "#9ca3af" : "#475569" }}>Total Max Risk</div>
                   <div style={{ fontSize: "13px", fontWeight: 700, color: "#ef4444" }}>₹{(selectedStrike.riskPerLot * selectedStrike.maxLots).toLocaleString()}</div>
                 </div>
               </div>
-              <div style={{ fontSize: "11px", color: "#9ca3af", display: "flex", flexDirection: "column", gap: "4px" }}>
+              <div style={{ fontSize: "11px", color: theme === "dark" ? "#9ca3af" : "#475569", display: "flex", flexDirection: "column", gap: "4px" }}>
                 <div>› SL: Exit if premium &lt; ₹{selectedStrike.hardStopPremium}</div>
                 <div>› T1: Book 33% at ₹{selectedStrike.target1} (+30%)</div>
                 <div>› T2: Book rest at ₹{selectedStrike.target2} (+80%)</div>
@@ -1032,18 +1051,18 @@ export default function Dashboard() {
                   viewBox="0 0 200 50" style={{transform:"scale(0.5,0.8)", transformOrigin:"0 0"}}/>
               </svg>
             </div>
-            <div style={{ marginTop: 4, paddingTop: 8, borderTop: "1px solid rgba(203,213,225,1)", display: "flex", justifyContent: "space-between", fontSize: 13, color: "#475569" }}>
-              <span>VWAP <span style={{ color: "#0f172a" }}>{signals?.vwap?.toFixed(2) ?? "—"}</span></span>
+            <div style={{ marginTop: 4, paddingTop: 8, borderTop: `1px solid ${theme === "dark" ? "#1f2937" : "rgba(203,213,225,1)"}`, display: "flex", justifyContent: "space-between", fontSize: 13, color: theme === "dark" ? "#9ca3af" : "#475569" }}>
+              <span>VWAP <span style={{ color: theme === "dark" ? "#f8fafc" : "#0f172a" }}>{signals?.vwap?.toFixed(2) ?? "—"}</span></span>
               <span>IV <span style={{ color: "#f0c040" }}>{signals ? (signals.iv * 100).toFixed(1) : "—"}%</span></span>
               <span>VIX <span style={{ color: vix > 20 ? "#dc2626" : "#00cc66" }}>{vix.toFixed(1)}</span></span>
             </div>
           </div>
 
           {/* Reversal Engine */}
-          <div className="panel panel-glow" style={{ padding: "8px", border: reversalState.startsWith("REVERSAL") ? "1px solid rgba(255, 200, 0, 0.8)" : "1px solid rgba(203,213,225,1)" }}>
+          <div className="panel panel-glow" style={{ padding: "8px", border: reversalState.startsWith("REVERSAL") ? "1px solid rgba(255, 200, 0, 0.8)" : theme === "dark" ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(203,213,225,1)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 13, color: "#475569", letterSpacing: "0.15em" }}>REVERSAL ENGINE</span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: reversalState.includes("LONG") ? "#10b981" : reversalState.includes("SHORT") ? "#ef4444" : "#0f172a" }} className={reversalState.startsWith("REVERSAL") ? "signal-pulse" : ""}>
+              <span style={{ fontSize: 13, color: theme === "dark" ? "#9ca3af" : "#475569", letterSpacing: "0.15em" }}>REVERSAL ENGINE</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: reversalState.includes("LONG") ? "#10b981" : reversalState.includes("SHORT") ? "#ef4444" : theme === "dark" ? "#f8fafc" : "#0f172a" }} className={reversalState.startsWith("REVERSAL") ? "signal-pulse" : ""}>
                 {reversalState.replace("_", " ")}
               </span>
             </div>
@@ -1052,23 +1071,23 @@ export default function Dashboard() {
           {/* Composite Score */}
           <div className="panel panel-glow" style={{ padding: "8px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
-              <span style={{ fontSize: 13, color: "#475569", letterSpacing: "0.15em" }} style={{ color: "#10b981", textShadow: "0 0 5px #10b981" }}>SELLER STRESS (CHAIN RADAR)</span>
-              <span style={{ fontSize: 13, color: "#2a4a6a" }}>MIN {strategyConfig.MIN_COMPOSITE_SCORE}/100</span>
+              <span style={{ fontSize: 13, color: "#10b981", textShadow: "0 0 5px #10b981", letterSpacing: "0.15em" }}>SELLER STRESS (CHAIN RADAR)</span>
+              <span style={{ fontSize: 13, color: theme === "dark" ? "#60a5fa" : "#2a4a6a" }}>MIN {strategyConfig.MIN_COMPOSITE_SCORE}/100</span>
             </div>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 4, marginBottom: 2 }}>
               <div className="ticker-val" style={{ fontSize: 40, fontWeight: 900, color: scoreColor(chainContext?.seller_stress_score ?? 0), lineHeight: 1 }}>
                 {chainContext ? chainContext.seller_stress_score.toFixed(1) : "0.0"}
               </div>
-              <div style={{ fontSize: 14, color: "#2a4a6a", marginBottom: 2 }}>/100</div>
+              <div style={{ fontSize: 14, color: theme === "dark" ? "#60a5fa" : "#2a4a6a", marginBottom: 2 }}>/100</div>
               <div style={{ marginLeft: "auto", textAlign: "right" }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: dirColor, letterSpacing: "0.05em" }}>
                   {signals?.direction ?? "—"}
                 </div>
-                <div style={{ fontSize: 13, color: "#475569" }}>DIRECTION</div>
+                <div style={{ fontSize: 13, color: theme === "dark" ? "#9ca3af" : "#475569" }}>DIRECTION</div>
               </div>
             </div>
             {/* Score gauge */}
-            <div style={{ position: "relative", height: 8, background: "rgba(203,213,225,1)", borderRadius: 4, overflow: "hidden", marginBottom: 2 }}>
+            <div style={{ position: "relative", height: 8, background: theme === "dark" ? "rgba(31, 41, 55, 0.6)" : "rgba(203,213,225,1)", borderRadius: 4, overflow: "hidden", marginBottom: 2 }}>
               <div style={{
                 height: "100%", borderRadius: 4,
                 width: `${Math.min(100, ((signals?.composite ?? 0) / 30) * 100)}%`,
@@ -1078,35 +1097,35 @@ export default function Dashboard() {
               <div style={{ position: "absolute", top: 0, left: "70%", width: 1, height: "100%", background: "rgba(255,255,255,0.2)" }}/>
             </div>
             {/* Confirmation timer */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#475569" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: theme === "dark" ? "#9ca3af" : "#475569" }}>
               <span>CONFIRM</span>
-              <div style={{ flex: 1, height: 4, background: "rgba(203,213,225,1)", borderRadius: 2 }}>
+              <div style={{ flex: 1, height: 4, background: theme === "dark" ? "rgba(31, 41, 55, 0.6)" : "rgba(203,213,225,1)", borderRadius: 2 }}>
                 <div style={{ height: "100%", borderRadius: 2, background: "#2563eb", width: `${(confirmTimer/8)*100}%`, transition: "width 0.3s" }}/>
               </div>
-              <span style={{ color: confirmTimer >= 3 ? "#10b981" : "#0f172a" }}>{Math.round(confirmTimer)}/8</span>
+              <span style={{ color: confirmTimer >= 3 ? "#10b981" : theme === "dark" ? "#f8fafc" : "#0f172a" }}>{Math.round(confirmTimer)}/8</span>
             </div>
           </div>
 
           {/* Axis Breakdown */}
           <div className="panel panel-glow" style={{ padding: "8px" }}>
-            <div style={{ fontSize: 13, color: "#475569", letterSpacing: "0.15em", marginBottom: 4 }}>INSTITUTIONAL RADAR</div>
+            <div style={{ fontSize: 13, color: theme === "dark" ? "#9ca3af" : "#475569", letterSpacing: "0.15em", marginBottom: 4 }}>INSTITUTIONAL RADAR</div>
             
             {chainContext && (
-              <div style={{ marginBottom: 2, padding: "6px", background: "rgba(16,185,129,0.05)", borderRadius: "8px", border: "1px solid rgba(16,185,129,0.2)" }}>
+              <div style={{ marginBottom: 2, padding: "6px", background: theme === "dark" ? "rgba(16,185,129,0.03)" : "rgba(16,185,129,0.05)", borderRadius: "8px", border: `1px solid ${theme === "dark" ? "rgba(16,185,129,0.15)" : "rgba(16,185,129,0.2)"}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ fontSize: 13, color: "#0f172a" }}>IV Skew Status</span>
+                  <span style={{ fontSize: 13, color: theme === "dark" ? "#e2e8f0" : "#0f172a" }}>IV Skew Status</span>
                   <span style={{ fontSize: 14, fontWeight: 700, color: chainContext.skew_direction === "CALL_BID" ? "#10b981" : chainContext.skew_direction === "PUT_BID" ? "#ef4444" : "#8b5cf6" }}>
                     {chainContext.skew_direction === "CALL_BID" ? "BULLISH (FEAR)" : chainContext.skew_direction === "PUT_BID" ? "BEARISH" : "NEUTRAL"}
                   </span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ fontSize: 13, color: "#0f172a" }}>Chain PCR</span>
+                  <span style={{ fontSize: 13, color: theme === "dark" ? "#e2e8f0" : "#0f172a" }}>Chain PCR</span>
                   <span style={{ fontSize: 14, fontWeight: 700, color: chainContext.current_pcr > 1.2 ? "#10b981" : chainContext.current_pcr < 0.8 ? "#ef4444" : "#8b5cf6" }}>
                     {chainContext.current_pcr.toFixed(2)}
                   </span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 13, color: "#0f172a" }}>Gamma Walls</span>
+                  <span style={{ fontSize: 13, color: theme === "dark" ? "#e2e8f0" : "#0f172a" }}>Gamma Walls</span>
                   <span style={{ fontSize: 13, color: "#f59e0b", textAlign: "right", fontFamily: "Orbitron" }}>
                     Call: {chainContext.nearest_call_wall || "None"} <br/> Put: {chainContext.nearest_put_wall || "None"}
                   </span>
@@ -1117,7 +1136,7 @@ export default function Dashboard() {
             
           {/* Market Microstructure */}
           <div className="panel panel-glow" style={{ padding: "8px", marginTop: "10px" }}>
-            <div style={{ fontSize: 13, color: "#475569", letterSpacing: "0.15em", marginBottom: 2 }}>AI LIVE METRICS</div>
+            <div style={{ fontSize: 13, color: theme === "dark" ? "#9ca3af" : "#475569", letterSpacing: "0.15em", marginBottom: 2 }}>AI LIVE METRICS</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
               {[
                 { label: "LIVE OFI", val: signals?.ofi ? (signals.ofi / 1000).toFixed(1) + "k" : "—" },
@@ -1125,9 +1144,9 @@ export default function Dashboard() {
                 { label: "VWAP", val: signals?.vwap ? signals.vwap.toFixed(1) : "—" },
                 { label: "ENGINE", val: "ONLINE" },
               ].map(m => (
-                <div key={m.label} style={{ background: "rgba(241,245,249,1)", border: "1px solid rgba(30,60,100,0.5)", borderRadius: 4, padding: "8px" }}>
-                  <div style={{ fontSize: 14, color: "#475569", marginBottom: 2 }}>{m.label}</div>
-                  <div style={{ fontSize: 13, fontFamily: "Orbitron", color: "#0f172a" }}>{m.val}</div>
+                <div key={m.label} style={{ background: theme === "dark" ? "rgba(31, 41, 55, 0.4)" : "rgba(241,245,249,1)", border: `1px solid ${theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(30,60,100,0.5)"}`, borderRadius: 4, padding: "8px" }}>
+                  <div style={{ fontSize: 14, color: theme === "dark" ? "#9ca3af" : "#475569", marginBottom: 2 }}>{m.label}</div>
+                  <div style={{ fontSize: 13, fontFamily: "Orbitron", color: theme === "dark" ? "#f8fafc" : "#0f172a" }}>{m.val}</div>
                 </div>
               ))}
             </div>
@@ -1139,7 +1158,7 @@ export default function Dashboard() {
           <div className="panel panel-glow" style={{ padding: "8px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div style={{ fontSize: 13, color: "#475569", letterSpacing: "0.15em" }}>STRIKE RECOMMENDATIONS</div>
+                <div style={{ fontSize: 13, color: theme === "dark" ? "#9ca3af" : "#475569", letterSpacing: "0.15em" }}>STRIKE RECOMMENDATIONS</div>
                 <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 2 }}>
                   {signals?.direction === "BULL" ? "→ BUY CALL OPTIONS (CE)" : signals?.direction === "BEAR" ? "→ BUY PUT OPTIONS (PE)" : "→ AWAITING DIRECTION"}
                 </div>
@@ -1150,7 +1169,7 @@ export default function Dashboard() {
                     ● SIGNAL ACTIVE
                   </div>
                 )}
-                <div style={{ fontSize: 14, color: "#475569" }}>Lot ₹ Risk: <span style={{ color: "#0f172a" }}>1.5% = ₹{Math.round(capital * 0.015).toLocaleString()}</span></div>
+                <div style={{ fontSize: 14, color: theme === "dark" ? "#9ca3af" : "#475569" }}>Lot ₹ Risk: <span style={{ color: theme === "dark" ? "#f8fafc" : "#0f172a" }}>1.5% = ₹{Math.round(capital * 0.015).toLocaleString()}</span></div>
               </div>
             </div>
           </div>
@@ -1174,7 +1193,7 @@ export default function Dashboard() {
                       <span style={{ fontFamily: "Orbitron", fontSize: 18, fontWeight: 700, color: s.type === "CE" ? "#059669" : "#f43f5e" }}>{s.strike}</span>
                       <span style={{ fontSize: 14, padding: "2px 6px", borderRadius: 3, background: s.type === "CE" ? "rgba(0,200,100,0.15)" : "rgba(255,60,80,0.15)", color: s.type === "CE" ? "#059669" : "#f43f5e", fontWeight: 700 }}>{s.type}</span>
                     </div>
-                    <div style={{ fontSize: 13, color: "#475569", marginTop: 2, letterSpacing: "0.1em" }}>{s.label} — RANK #{s.rank}</div>
+                    <div style={{ fontSize: 13, color: theme === "dark" ? "#9ca3af" : "#475569", marginTop: 2, letterSpacing: "0.1em" }}>{s.label} — RANK #{s.rank}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontFamily: "Orbitron", fontSize: 14, fontWeight: 700, color: scoreColor(s.strikeScore) }}>
@@ -1186,9 +1205,9 @@ export default function Dashboard() {
 
                 {/* Premium */}
                 <div style={{ display: "flex", gap: 4, marginBottom: 2 }}>
-                  <div style={{ flex: 1, background: "linear-gradient(135deg, rgba(255,255,255,1), rgba(241,245,249,0.9))", backdropFilter: "blur(12px)", borderRadius: 4, padding: "6px 8px", border: "1px solid rgba(203,213,225,1)", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
-                    <div style={{ fontSize: 14, color: "#475569", marginBottom: 1 }}>BS PREM</div>
-                    <div style={{ fontFamily: "Orbitron", fontSize: 16, fontWeight: 700, color: "#1e293b" }}>₹{s.premium}</div>
+                  <div style={{ flex: 1, background: theme === "dark" ? "linear-gradient(135deg, rgba(31,41,55,0.6), rgba(17,24,39,0.7))" : "linear-gradient(135deg, rgba(255,255,255,1), rgba(241,245,249,0.9))", backdropFilter: "blur(12px)", borderRadius: 4, padding: "6px 8px", border: `1px solid ${theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(203,213,225,1)"}`, boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
+                    <div style={{ fontSize: 14, color: theme === "dark" ? "#9ca3af" : "#475569", marginBottom: 1 }}>BS PREM</div>
+                    <div style={{ fontFamily: "Orbitron", fontSize: 16, fontWeight: 700, color: theme === "dark" ? "#f8fafc" : "#1e293b" }}>₹{s.premium}</div>
                   </div>
                   <div style={{ flex: 1, background: "rgba(16,185,129,0.15)", borderRadius: 4, padding: "6px 8px", border: "1px solid rgba(16,185,129,0.2)" }}>
                     <div style={{ fontSize: 14, color: "#059669", marginBottom: 1 }}>LIVE PREM</div>
@@ -1196,9 +1215,9 @@ export default function Dashboard() {
                       {liveOptions[s.strike]?.[s.type] ? `₹${liveOptions[s.strike][s.type]}` : "WAIT"}
                     </div>
                   </div>
-                  <div style={{ flex: 1, background: "linear-gradient(135deg, rgba(255,255,255,1), rgba(241,245,249,0.9))", backdropFilter: "blur(12px)", borderRadius: 4, padding: "6px 8px", border: "1px solid rgba(203,213,225,1)", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
-                    <div style={{ fontSize: 14, color: "#475569", marginBottom: 1 }}>MAX LOTS</div>
-                    <div style={{ fontFamily: "Orbitron", fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{s.maxLots}</div>
+                  <div style={{ flex: 1, background: theme === "dark" ? "linear-gradient(135deg, rgba(31,41,55,0.6), rgba(17,24,39,0.7))" : "linear-gradient(135deg, rgba(255,255,255,1), rgba(241,245,249,0.9))", backdropFilter: "blur(12px)", borderRadius: 4, padding: "6px 8px", border: `1px solid ${theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(203,213,225,1)"}`, boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
+                    <div style={{ fontSize: 14, color: theme === "dark" ? "#9ca3af" : "#475569", marginBottom: 1 }}>MAX LOTS</div>
+                    <div style={{ fontFamily: "Orbitron", fontSize: 16, fontWeight: 700, color: theme === "dark" ? "#f8fafc" : "#0f172a" }}>{s.maxLots}</div>
                   </div>
                 </div>
 
@@ -1209,16 +1228,16 @@ export default function Dashboard() {
                     { label: "T1 +30%", val: `₹${s.target1}`, color: "#f59e0b" },
                     { label: "T2 +80%", val: `₹${s.target2}`, color: "#10b981" },
                   ].map(({ label, val, color }) => (
-                    <div key={label} style={{ background: "rgba(241,245,249,1)", borderRadius: 3, padding: "4px 6px", borderLeft: `2px solid ${color}44`, borderTop: "1px solid rgba(203,213,225,0.5)", borderRight: "1px solid rgba(203,213,225,0.5)", borderBottom: "1px solid rgba(203,213,225,0.5)" }}>
-                      <div style={{ fontSize: 13, color: "#475569", marginBottom: 1 }}>{label}</div>
+                    <div key={label} style={{ background: theme === "dark" ? "rgba(31, 41, 55, 0.4)" : "rgba(241,245,249,1)", borderRadius: 3, padding: "4px 6px", borderLeft: `2px solid ${color}44`, borderTop: `1px solid ${theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(203,213,225,0.5)"}`, borderRight: `1px solid ${theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(203,213,225,0.5)"}`, borderBottom: `1px solid ${theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(203,213,225,0.5)"}` }}>
+                      <div style={{ fontSize: 13, color: theme === "dark" ? "#9ca3af" : "#475569", marginBottom: 1 }}>{label}</div>
                       <div style={{ fontSize: 14, fontWeight: 700, color }}>{val}</div>
                     </div>
                   ))}
                 </div>
 
                 {/* Greeks row */}
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#475569", borderTop: "1px solid rgba(226,232,240,1)", paddingTop: 6, marginBottom: 4 }}>
-                  <span>Δ <span style={{ color: "#0f172a" }}>{s.greeks.delta.toFixed(3)}</span></span>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: theme === "dark" ? "#9ca3af" : "#475569", borderTop: `1px solid ${theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(226,232,240,1)"}`, paddingTop: 6, marginBottom: 4 }}>
+                  <span>Δ <span style={{ color: theme === "dark" ? "#f8fafc" : "#0f172a" }}>{s.greeks.delta.toFixed(3)}</span></span>
                   <span>Γ <span style={{ color: "#8b5cf6" }}>{s.greeks.gamma.toFixed(4)}</span></span>
                   <span>Θ <span style={{ color: "#dc2626" }}>{s.greeks.theta.toFixed(2)}</span></span>
                   <span>V <span style={{ color: "#44aaff" }}>{s.greeks.vega.toFixed(2)}</span></span>
@@ -1226,10 +1245,10 @@ export default function Dashboard() {
 
                 {/* Prob & BEP */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ fontSize: 13, color: "#475569" }}>BEP <span style={{ color: "#1e293b" }}>{s.breakeven}</span></div>
+                  <div style={{ fontSize: 13, color: theme === "dark" ? "#9ca3af" : "#475569" }}>BEP <span style={{ color: theme === "dark" ? "#f8fafc" : "#1e293b" }}>{s.breakeven}</span></div>
                   <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <div style={{ fontSize: 13, color: "#475569" }}>P(profit)</div>
-                    <div style={{ width: 60, height: 4, background: "rgba(226,232,240,1)", borderRadius: 2 }}>
+                    <div style={{ fontSize: 13, color: theme === "dark" ? "#9ca3af" : "#475569" }}>P(profit)</div>
+                    <div style={{ width: 60, height: 4, background: theme === "dark" ? "rgba(31, 41, 55, 0.6)" : "rgba(226,232,240,1)", borderRadius: 2 }}>
                       <div style={{ width: `${s.probProfit}%`, height: "100%", borderRadius: 2, background: s.probProfit > 50 ? "#059669" : s.probProfit > 35 ? "#f59e0b" : "#ef4444" }}/>
                     </div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: s.probProfit > 50 ? "#059669" : "#ff9944" }}>{s.probProfit}%</div>
@@ -1246,7 +1265,7 @@ export default function Dashboard() {
                 {/* Rationale */}
                 <div style={{ marginTop: 6 }}>
                   {s.rationale.map((r, ri) => (
-                    <div key={ri} style={{ fontSize: 14, color: "#475569", marginTop: 2 }}>› {r}</div>
+                    <div key={ri} style={{ fontSize: 14, color: theme === "dark" ? "#e2e8f0" : "#475569", marginTop: 2 }}>› {r}</div>
                   ))}
                 </div>
               </div>
@@ -1255,42 +1274,42 @@ export default function Dashboard() {
 
           {/* Selected Strike Detail */}
           {selectedStrike && (
-            <div className="panel" style={{ padding: "8px", border: "1px solid rgba(59,130,246,0.3)" }}>
-              <div style={{ fontSize: 13, color: "#475569", letterSpacing: "0.15em", marginBottom: 2 }}>
+            <div className="panel" style={{ padding: "8px", border: `1px solid ${theme === "dark" ? "rgba(59,130,246,0.5)" : "rgba(59,130,246,0.3)"}` }}>
+              <div style={{ fontSize: 13, color: theme === "dark" ? "#9ca3af" : "#475569", letterSpacing: "0.15em", marginBottom: 2 }}>
                 TRADE PLAN — {instrument} {selectedStrike.strike} {selectedStrike.type}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 2 }}>
                 {[
-                  { label: "ENTRY (limit)", val: `₹${liveOptions[selectedStrike.strike]?.[selectedStrike.type] || selectedStrike.premium}`, sub: "LMT +0.1% buffer", color: "#0f172a" },
+                  { label: "ENTRY (limit)", val: `₹${liveOptions[selectedStrike.strike]?.[selectedStrike.type] || selectedStrike.premium}`, sub: "LMT +0.1% buffer", color: theme === "dark" ? "#f8fafc" : "#0f172a", baseColor: "#0f172a" },
                   { label: "HARD STOP", val: `₹${selectedStrike.hardStopPremium}`, sub: "40% loss → EXIT", color: "#ef4444" },
                   { label: "TARGET 1", val: `₹${selectedStrike.target1}`, sub: "Book 33% here", color: "#f59e0b" },
                   { label: "TARGET 2", val: `₹${selectedStrike.target2}`, sub: "Trail 33% remain", color: "#10b981" },
-                ].map(({ label, val, sub, color }) => (
-                  <div key={label} style={{ background: "linear-gradient(135deg, rgba(255,255,255,1), rgba(241,245,249,0.9))", backdropFilter: "blur(12px)", border: `1px solid ${color}33`, borderRadius: 4, padding: "2px 6px" }}>
-                    <div style={{ fontSize: 14, color: "#475569", marginBottom: 2 }}>{label}</div>
+                ].map(({ label, val, sub, color, baseColor }) => (
+                  <div key={label} style={{ background: theme === "dark" ? "linear-gradient(135deg, rgba(31,41,55,0.6), rgba(17,24,39,0.7))" : "linear-gradient(135deg, rgba(255,255,255,1), rgba(241,245,249,0.9))", backdropFilter: "blur(12px)", border: `1px solid ${baseColor === "#0f172a" ? (theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(203,213,225,1)") : color + "33"}`, borderRadius: 4, padding: "2px 6px" }}>
+                    <div style={{ fontSize: 14, color: theme === "dark" ? "#9ca3af" : "#475569", marginBottom: 2 }}>{label}</div>
                     <div style={{ fontFamily: "Orbitron", fontSize: 16, fontWeight: 700, color }}>{val}</div>
                     <div style={{ fontSize: 14, color: "#94a3b8", marginTop: 2 }}>{sub}</div>
                   </div>
                 ))}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                <div style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.9), rgba(248,250,252,0.9))", backdropFilter: "blur(12px)", boxShadow: "0 8px 32px rgba(0,0,0,0.05)", borderRadius: 4, padding: "2px 6px", border: "1px solid rgba(203,213,225,1)" }}>
-                  <div style={{ fontSize: 14, color: "#475569", marginBottom: 4, letterSpacing: "0.1em" }}>POSITION SIZING</div>
+                <div style={{ background: theme === "dark" ? "linear-gradient(135deg, rgba(31,41,55,0.6), rgba(17,24,39,0.7))" : "linear-gradient(135deg, rgba(255,255,255,0.9), rgba(248,250,252,0.9))", backdropFilter: "blur(12px)", boxShadow: "0 8px 32px rgba(0,0,0,0.05)", borderRadius: 4, padding: "2px 6px", border: `1px solid ${theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(203,213,225,1)"}` }}>
+                  <div style={{ fontSize: 14, color: theme === "dark" ? "#9ca3af" : "#475569", marginBottom: 4, letterSpacing: "0.1em" }}>POSITION SIZING</div>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}>
-                    <span style={{ color: "#475569" }}>Max Lots</span>
-                    <span style={{ color: "#0f172a", fontWeight: 700 }}>{selectedStrike.maxLots} lots ({selectedStrike.maxLots * LOT_SIZE[instrument]} units)</span>
+                    <span style={{ color: theme === "dark" ? "#9ca3af" : "#475569" }}>Max Lots</span>
+                    <span style={{ color: theme === "dark" ? "#f8fafc" : "#0f172a", fontWeight: 700 }}>{selectedStrike.maxLots} lots ({selectedStrike.maxLots * LOT_SIZE[instrument]} units)</span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}>
-                    <span style={{ color: "#475569" }}>Max Risk/Lot</span>
+                    <span style={{ color: theme === "dark" ? "#9ca3af" : "#475569" }}>Max Risk/Lot</span>
                     <span style={{ color: "#dc2626" }}>₹{selectedStrike.riskPerLot.toLocaleString()}</span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                    <span style={{ color: "#475569" }}>Total Max Risk</span>
+                    <span style={{ color: theme === "dark" ? "#9ca3af" : "#475569" }}>Total Max Risk</span>
                     <span style={{ color: "#ef4444", fontWeight: 700 }}>₹{(selectedStrike.riskPerLot * selectedStrike.maxLots).toLocaleString()}</span>
                   </div>
                 </div>
-                <div style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.9), rgba(248,250,252,0.9))", backdropFilter: "blur(12px)", boxShadow: "0 8px 32px rgba(0,0,0,0.05)", borderRadius: 4, padding: "2px 6px", border: "1px solid rgba(203,213,225,1)" }}>
-                  <div style={{ fontSize: 14, color: "#475569", marginBottom: 4, letterSpacing: "0.1em" }}>EXIT RULES</div>
+                <div style={{ background: theme === "dark" ? "linear-gradient(135deg, rgba(31,41,55,0.6), rgba(17,24,39,0.7))" : "linear-gradient(135deg, rgba(255,255,255,0.9), rgba(248,250,252,0.9))", backdropFilter: "blur(12px)", boxShadow: "0 8px 32px rgba(0,0,0,0.05)", borderRadius: 4, padding: "2px 6px", border: `1px solid ${theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(203,213,225,1)"}` }}>
+                  <div style={{ fontSize: 14, color: theme === "dark" ? "#9ca3af" : "#475569", marginBottom: 4, letterSpacing: "0.1em" }}>EXIT RULES</div>
                   {[
                     "Phase 1: Exit if premium < ₹" + selectedStrike.hardStopPremium,
                     "Phase 2: Trail to Peak × 0.75",
@@ -1299,7 +1318,7 @@ export default function Dashboard() {
                     "Max hold: 45 minutes",
                     "Mandatory exit: 14:45"
                   ].map((rule, ri) => (
-                    <div key={ri} style={{ fontSize: 14, color: "#475569", marginBottom: 2 }}>› {rule}</div>
+                    <div key={ri} style={{ fontSize: 14, color: theme === "dark" ? "#e2e8f0" : "#475569", marginBottom: 2 }}>› {rule}</div>
                   ))}
                 </div>
               </div>
@@ -1312,17 +1331,17 @@ export default function Dashboard() {
 
           {/* Fakeout battery */}
           <div className="panel panel-glow" style={{ padding: "8px" }}>
-            <div style={{ fontSize: 13, color: "#475569", letterSpacing: "0.15em", marginBottom: 2 }}>FAKEOUT BATTERY</div>
+            <div style={{ fontSize: 13, color: theme === "dark" ? "#9ca3af" : "#475569", letterSpacing: "0.15em", marginBottom: 2 }}>FAKEOUT BATTERY</div>
             {[
               { label: "Spread Toxicity", pass: true, detail: "Protected by AI Filter" },
               { label: "Reversal Trap", pass: true, detail: "Filtered by Engine" },
               { label: "Time Filter", pass: true, detail: "Checked by Backend" },
               { label: "Sweep Threshold", pass: (signals?.velocity ?? 0) > 15 ? true : false, detail: "TPS > 15 required for sweeps" },
             ].map(({ label, pass, detail }) => (
-              <div key={label} style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2, padding: "6px 8px", background: pass ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)", borderRadius: 4, border: `1px solid ${pass ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}` }}>
+              <div key={label} style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2, padding: "6px 8px", background: pass ? (theme === "dark" ? "rgba(16,185,129,0.05)" : "rgba(16,185,129,0.1)") : (theme === "dark" ? "rgba(239,68,68,0.05)" : "rgba(239,68,68,0.1)"), borderRadius: 4, border: `1px solid ${pass ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}` }}>
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: pass ? "#059669" : "#ef4444", flexShrink: 0, ...(pass ? {} : { animation: "pulse 0.8s ease-in-out infinite" }) }}/>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, color: pass ? "#0f172a" : "#dc2626" }}>{label}</div>
+                  <div style={{ fontSize: 13, color: pass ? (theme === "dark" ? "#e2e8f0" : "#0f172a") : "#dc2626" }}>{label}</div>
                   <div style={{ fontSize: 14, color: "#94a3b8" }}>{detail}</div>
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: pass ? "#059669" : "#ef4444" }}>{pass ? "PASS" : "FAIL"}</div>
@@ -1332,26 +1351,26 @@ export default function Dashboard() {
 
           {/* Trade phase tracker */}
           <div className="panel panel-glow" style={{ padding: "8px" }}>
-            <div style={{ fontSize: 13, color: "#475569", letterSpacing: "0.15em", marginBottom: 2 }}>EXIT PHASE TRACKER</div>
+            <div style={{ fontSize: 13, color: theme === "dark" ? "#9ca3af" : "#475569", letterSpacing: "0.15em", marginBottom: 2 }}>EXIT PHASE TRACKER</div>
             {[
               { phase: "P1", label: "PROTECTION", range: "Entry → +30%", rule: "Hard stop @ 40% loss", color: "#dc2626" },
               { phase: "P2", label: "MOMENTUM", range: "+30% → +80%", rule: "Trail Peak × 0.75", color: "#f59e0b" },
               { phase: "P3", label: "ACCELERATION", range: "+80% → ∞", rule: "Trail Peak × 0.80", color: "#10b981" },
               { phase: "P4", label: "EXHAUSTION", range: "Any phase", rule: "OFI flip / Vol cliff", color: "#ef4444" },
             ].map(({ phase: ph, label, range, rule, color }) => (
-              <div key={ph} style={{ marginBottom: 2, padding: "7px 10px", borderRadius: 4, background: "linear-gradient(135deg, rgba(255,255,255,0.9), rgba(248,250,252,0.9))", backdropFilter: "blur(12px)", boxShadow: "0 8px 32px rgba(0,0,0,0.05)", border: `1px solid ${color}22`, borderLeft: `2px solid ${color}` }}>
+              <div key={ph} style={{ marginBottom: 2, padding: "7px 10px", borderRadius: 4, background: theme === "dark" ? "linear-gradient(135deg, rgba(31,41,55,0.6), rgba(17,24,39,0.7))" : "linear-gradient(135deg, rgba(255,255,255,0.9), rgba(248,250,252,0.9))", backdropFilter: "blur(12px)", boxShadow: "0 8px 32px rgba(0,0,0,0.05)", border: `1px solid ${color}22`, borderLeft: `2px solid ${color}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color, fontFamily: "Orbitron" }}>{ph}: {label}</span>
                   <span style={{ fontSize: 14, color: "#94a3b8" }}>{range}</span>
                 </div>
-                <div style={{ fontSize: 14, color: "#475569" }}>{rule}</div>
+                <div style={{ fontSize: 14, color: theme === "dark" ? "#e2e8f0" : "#475569" }}>{rule}</div>
               </div>
             ))}
           </div>
 
           {/* Alert log */}
           <div className="panel panel-glow" style={{ padding: "8px", flex: 1, overflowY: "auto", minHeight: 0 }}>
-            <div style={{ fontSize: 13, color: "#475569", letterSpacing: "0.15em", marginBottom: 2 }}>SIGNAL LOG</div>
+            <div style={{ fontSize: 13, color: theme === "dark" ? "#9ca3af" : "#475569", letterSpacing: "0.15em", marginBottom: 2 }}>SIGNAL LOG</div>
             {alertLog.length === 0 ? (
               <div style={{ fontSize: 13, color: "#94a3b8", textAlign: "center", paddingTop: 20 }}>
                 <div className="scan-rotate" style={{ width: 24, height: 24, border: "1.5px solid #cbd5e1", borderTop: "1.5px solid #3b82f6", borderRadius: "50%", margin: "0 auto 10px" }}/>
@@ -1360,8 +1379,8 @@ export default function Dashboard() {
             ) : alertLog.map((a, i) => (
               <div key={i} className="alert-item" style={{
                 marginBottom: 7, padding: "7px 10px",
-                background: a.type === "bull" ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
-                border: `1px solid ${a.type === "bull" ? "rgba(16,185,129,0.25)" : "rgba(239,68,68,0.25)"}`,
+                background: a.type === "bull" ? (theme === "dark" ? "rgba(16,185,129,0.05)" : "rgba(16,185,129,0.1)") : (theme === "dark" ? "rgba(239,68,68,0.05)" : "rgba(239,68,68,0.1)"),
+                border: `1px solid ${a.type === "bull" ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)"}`,
                 borderRadius: 4,
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
@@ -1370,8 +1389,8 @@ export default function Dashboard() {
                   </span>
                   <span style={{ fontSize: 14, color: "#94a3b8" }}>{a.time}</span>
                 </div>
-                <div style={{ fontSize: 14, color: "#475569" }}>{a.msg}</div>
-                <div style={{ marginTop: 3, height: 2, background: "rgba(203,213,225,1)", borderRadius: 1 }}>
+                <div style={{ fontSize: 14, color: theme === "dark" ? "#e2e8f0" : "#475569" }}>{a.msg}</div>
+                <div style={{ marginTop: 3, height: 2, background: theme === "dark" ? "rgba(31, 41, 55, 0.6)" : "rgba(203,213,225,1)", borderRadius: 1 }}>
                   <div style={{ width: `${(a.score/100)*100}%`, height: "100%", borderRadius: 1, background: a.type === "bull" ? "#059669" : "#f43f5e" }}/>
                 </div>
               </div>
@@ -1380,7 +1399,7 @@ export default function Dashboard() {
 
           {/* Time gate */}
           <div className="panel" style={{ padding: "6px 8px" }}>
-            <div style={{ fontSize: 13, color: "#475569", letterSpacing: "0.15em", marginBottom: 2 }}>TIME GATE</div>
+            <div style={{ fontSize: 13, color: theme === "dark" ? "#9ca3af" : "#475569", letterSpacing: "0.15em", marginBottom: 2 }}>TIME GATE</div>
             {[
               { zone: "09:15–09:45", label: "BLOCKED", color: "#ef4444" },
               { zone: "09:45–11:30", label: "PRIME", color: "#10b981" },
