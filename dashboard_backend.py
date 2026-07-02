@@ -943,66 +943,67 @@ def connect_sharekhan() -> None:
                          for i, (_, ofi_val) in enumerate(ofi_history)]
                     )
 
-                    sweep_result = signal_engine.check_velocity_sweep_signal(
-                        df=ai_candles[strike_key],
-                        nifty_ofi=global_ofi,
-                        velocity_tps=velocity_tps,
-                        opt_type=info["optType"],
-                        reversal_state=current_rev_state,
-                        bid=bid, ask=ask, ltp=ltp,
-                        chain_context=global_chain_context,
-                    )
-
-                    if not hasattr(signal_engine, "sweep_memory"):
-                        signal_engine.sweep_memory = {}
+                    # Only generate signals for contracts within -/+ 5 strikes of ATM
+                    atm_strike = round(last_nifty_spot / 50) * 50
+                    strike_diff = abs(info["strike"] - atm_strike) / 50
 
                     is_buy     = False
                     trade_type = "AI_BUY"
                     score      = 0.0
-
-                    # FIX: always initialise buy_result so `components_to_send`
-                    # below can safely reference it regardless of branch taken
                     buy_result = None
+                    sweep_result = None
+                    active_result = None
 
-                    if sweep_result.fired:
-                        atm_strike = round(last_nifty_spot / 50) * 50
-                        if info["strike"] == atm_strike:
-                            is_buy     = True
-                            trade_type = "AGGRESSIVE_SWEEP"
-                            score      = sweep_result.score
-                            signal_engine.sweep_memory[strike_key] = {
-                                "score": score,
-                                "time":  time.time(),
-                            }
-                            print(f"⚡ [TAPE SPEED SWEEP] TPS: {velocity_tps:.1f} | SCORE: {score:.1f}")
-                            print(f"   Reason: {sweep_result.reason}")
-                    else:
-                        buy_result = signal_engine.check_ai_buy_signal(
+                    if strike_diff <= 5:
+                        sweep_result = signal_engine.check_velocity_sweep_signal(
                             df=ai_candles[strike_key],
                             nifty_ofi=global_ofi,
+                            velocity_tps=velocity_tps,
                             opt_type=info["optType"],
                             reversal_state=current_rev_state,
                             bid=bid, ask=ask, ltp=ltp,
                             chain_context=global_chain_context,
-                            ofi_history=current_ofi_history,
                         )
-                        is_buy = buy_result.fired
-                        score  = buy_result.score
 
-                        # If a sweep latched in last 3 s, keep its score visible
-                        memory = signal_engine.sweep_memory.get(strike_key)
-                        if memory and time.time() - memory["time"] < 3.0:
-                            score = max(score, memory["score"])
+                        if not hasattr(signal_engine, "sweep_memory"):
+                            signal_engine.sweep_memory = {}
 
-                    # FIX: select the correct result object for components
-                    if sweep_result.fired:
-                        active_result = sweep_result
-                    elif buy_result is not None:
-                        active_result = buy_result
-                    else:
-                        active_result = sweep_result   # blocked sweep — empty scores
+                        if sweep_result.fired:
+                            # A sweep signal is only allowed at exact ATM
+                            if info["strike"] == atm_strike:
+                                is_buy     = True
+                                trade_type = "AGGRESSIVE_SWEEP"
+                                score      = sweep_result.score
+                                signal_engine.sweep_memory[strike_key] = {
+                                    "score": score,
+                                    "time":  time.time(),
+                                }
+                                print(f"⚡ [TAPE SPEED SWEEP] TPS: {velocity_tps:.1f} | SCORE: {score:.1f}")
+                                print(f"   Reason: {sweep_result.reason}")
+                        else:
+                            buy_result = signal_engine.check_ai_buy_signal(
+                                df=ai_candles[strike_key],
+                                nifty_ofi=global_ofi,
+                                opt_type=info["optType"],
+                                reversal_state=current_rev_state,
+                                bid=bid, ask=ask, ltp=ltp,
+                                chain_context=global_chain_context,
+                                ofi_history=current_ofi_history,
+                            )
+                            is_buy = buy_result.fired
+                            score  = buy_result.score
 
-                    components_to_send = getattr(active_result, "scores", {})
+                            # If a sweep latched in last 3 s, keep its score visible
+                            memory = signal_engine.sweep_memory.get(strike_key)
+                            if memory and time.time() - memory["time"] < 3.0:
+                                score = max(score, memory["score"])
+
+                        if sweep_result and sweep_result.fired:
+                            active_result = sweep_result
+                        elif buy_result is not None:
+                            active_result = buy_result
+
+                    components_to_send = getattr(active_result, "scores", {}) if active_result is not None else {}
 
                     broadcast_tick({
                         "type":       "score_update",

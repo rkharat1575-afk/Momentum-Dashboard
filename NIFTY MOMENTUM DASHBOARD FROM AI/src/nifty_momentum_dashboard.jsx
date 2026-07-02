@@ -442,7 +442,7 @@ export default function Dashboard() {
               spot: tick.price,
               direction: bestDir,
               composite: maxScore,
-              iv: vixRef.current,
+              iv: vixRef.current / 100,
               ofi: tick.ofi,
               velocity: tick.velocity_tps,
               vwap: tick.vwap

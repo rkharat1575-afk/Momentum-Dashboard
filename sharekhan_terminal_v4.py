@@ -1119,6 +1119,20 @@ with sig_col:
                 strength = "⚠ WAIT (No Option Momentum)"
                 css_trade = "signal-neut"  # Downgrade visually if fighting momentum
 
+            action_advice = ""
+            if "BULL" in direction: # CE Trade
+                if "BUY WALL" in imbalance: action_advice = "(🚀 IDEAL FOR CE)"
+                elif "ABSORBING" in imbalance: action_advice = "(👍 GOOD FOR CE)"
+                elif "SELL WALL" in imbalance: action_advice = "(⚠️ DANGER: AVOID CE)"
+                elif "AGGRESSIVE" in imbalance: action_advice = "(⚠️ CAUTION)"
+                else: action_advice = "(⚖️ WAIT FOR VOL)"
+            else: # PE Trade
+                if "SELL WALL" in imbalance: action_advice = "(🚀 IDEAL FOR PE)"
+                elif "AGGRESSIVE" in imbalance: action_advice = "(👍 GOOD FOR PE)"
+                elif "BUY WALL" in imbalance: action_advice = "(⚠️ DANGER: AVOID PE)"
+                elif "ABSORBING" in imbalance: action_advice = "(⚠️ CAUTION)"
+                else: action_advice = "(⚖️ WAIT FOR VOL)"
+
             st.markdown(f"""<div class="{css_trade}">
             <b>BUY {best_type} {best_strike}</b> {strength} <span style="color:#00d4ff">{spike_text}</span><br>
             Strike Score : {strike_score}/100<br>
@@ -1127,7 +1141,7 @@ with sig_col:
             SL    : {sl:.1f} (Max -15 pts)<br>
             Tgt 1 : {tgt1:.1f} (+10 pts Scalp)<br>
             Tgt 2 : {tgt2:.1f} (+20 pts)<br>
-            Imbalance: {imbalance}
+            Imbalance: {imbalance} <span style="color:#ffd700"><b>{action_advice}</b></span>
             </div>""",unsafe_allow_html=True)
         elif confidence < 60 and best_strike > 0:
             st.markdown(f'<div class="signal-neut">⚠ LOW CONFIDENCE ({confidence}%) — WAIT<br>Need ≥60% to trade</div>',unsafe_allow_html=True)
